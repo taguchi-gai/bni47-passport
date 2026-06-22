@@ -1,0 +1,40 @@
+# Version control
+.git
+.gitignore
+
+# Dependencies
+node_modules/
+.venv/
+backend/.venv/
+__pycache__/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Frontend (not needed for backend)
+frontend/node_modules/
+frontend/.next/
+frontend/dist/
+frontend/build/
+
+# Test files
+backend/test_*.py
+backend/.pytest_cache/
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+
+# Local development
+.claude/
+.firebase/

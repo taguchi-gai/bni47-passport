@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+.env
+.env.local
+*.db
+*.sqlite
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+dist/
+build/
+.next/
+.nuxt/
+.cache/
+.vuepress/dist/
+.cache/
+.vuepress/dist/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Firebase
+.firebase/
+.firebaserc
+firebase.json

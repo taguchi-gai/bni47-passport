@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\OneDrive\\\\Desktop\\\\Claude Project\\\\trash\\\\47pasport\" -Force)",
+      "Bash(find \"/c/Users/user/OneDrive/Desktop\" -maxdepth 2 -type d -name \"*BNI*\" -o -name \"*Passport*\" 2>/dev/null | head -20)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\user\\\\OneDrive\\\\Desktop\" -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"BNI|Passport\" })",
+      "PowerShell(Head -20)",
+      "mcp__Claude_in_Chrome__tabs_context_mcp",
+      "mcp__Claude_in_Chrome__browser_batch",
+      "mcp__Claude_in_Chrome__get_page_text",
+      "PowerShell($proc = Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($proc\\) { Stop-Process -Id $proc.OwningProcess -Force; Write-Output \"Stopped PID $\\($proc.OwningProcess\\)\" } else { Write-Output \"No process on 5173\" })",
+      "mcp__Claude_in_Chrome__navigate",
+      "mcp__Claude_in_Chrome__list_connected_browsers",
+      "mcp__Claude_in_Chrome__select_browser",
+      "mcp__Claude_in_Chrome__tabs_create_mcp",
+      "PowerShell($env:RAILWAY_TOKEN = \"a4a9f298-2dcb-4a25-9e1f-e5dd317340fc\"; railway whoami 2>&1)",
+      "mcp__Claude_in_Chrome__find",
+      "mcp__Claude_in_Chrome__javascript_tool",
+      "Bash(Get-ChildItem -Recurse -Depth 2 -Exclude \".venv\",\"node_modules\")",
+      "Bash(Select-Object FullName)",
+      "Bash(Format-Table -AutoSize)",
+      "mcp__Claude_in_Chrome__read_page",
+      "PowerShell(gcloud config list)",
+      "PowerShell(gcloud projects list)"
+    ]
+  }
+}
