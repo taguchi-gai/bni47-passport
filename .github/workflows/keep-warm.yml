@@ -1,0 +1,19 @@
+name: Keep Render service warm
+
+# Render 無料プランは15分アイドルでスリープし、次回起動に30秒〜1分かかる。
+# 10分おきに /health を叩いてスリープを防ぐ（public リポジトリのため Actions 利用は無料）。
+# 注: GitHub のスケジュールは数分ずれることがある（ベストエフォート）。
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'   # 10分ごと
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 https://bni47-passport.onrender.com/health || echo "000")
+          echo "Health check returned HTTP $code"

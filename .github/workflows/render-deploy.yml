@@ -7,6 +7,9 @@ on:
   push:
     branches:
       - master
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
 
 jobs:
   trigger-render-deploy:
