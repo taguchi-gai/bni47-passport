@@ -1,0 +1,23 @@
+name: Deploy to Render
+
+# master への push 時に Render の Deploy Hook を叩いて自動デプロイする。
+# RENDER_DEPLOY_HOOK は GitHub の Secrets に登録した Render Deploy Hook URL。
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  trigger-render-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
+            echo "RENDER_DEPLOY_HOOK secret is not set. Skipping." >&2
+            exit 1
+          fi
+          echo "Triggering Render deploy..."
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+          echo "Deploy triggered."
