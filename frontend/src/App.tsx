@@ -75,12 +75,23 @@ export default function App() {
   }
 
   if (!user) {
-    if (authView === "register") {
-      return <Register onLogin={handleLogin} onBack={() => setAuthView("login")} />;
+    // URL ハッシュで登録画面を出せるようにする（招待リンクとして配布できる）
+    const hash = window.location.hash;
+    if (authView === "register" || hash === "#register") {
+      return (
+        <Register
+          onLogin={handleLogin}
+          onBack={() => {
+            setAuthView("login");
+            if (hash === "#register") window.location.hash = "";
+          }}
+        />
+      );
     }
     return (
       <Login
         onLogin={handleLogin}
+        onShowRegister={() => setAuthView("register")}
       />
     );
   }

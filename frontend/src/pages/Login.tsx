@@ -3,9 +3,10 @@ import { loginRequest, api } from "../api/client";
 
 interface Props {
   onLogin: (token: string, role: string, name: string, userId: number) => void;
+  onShowRegister?: () => void;
 }
 
-export default function Login({ onLogin }: Props) {
+export default function Login({ onLogin, onShowRegister }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -113,7 +114,18 @@ export default function Login({ onLogin }: Props) {
           </button>
         </form>
         <p className="mt-4 text-center text-sm text-gray-500">
-          新メンバーの方は管理者から招待URLを受け取ってください
+          アカウントをお持ちでない方は{" "}
+          {onShowRegister ? (
+            <button
+              type="button"
+              onClick={onShowRegister}
+              className="text-indigo-600 hover:underline font-medium"
+            >
+              新規登録
+            </button>
+          ) : (
+            <span>新規登録</span>
+          )}
         </p>
       </div>
     </div>
