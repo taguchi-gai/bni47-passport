@@ -61,15 +61,20 @@ def create_meet_event(
 
         end_datetime = start_datetime + timedelta(hours=1)
 
+        # DB は naive UTC で保存している前提。Google Calendar には UTC として明示的に渡し、
+        # timeZone は表示用に Asia/Tokyo を指定する（dateTime に Z があれば UTC が優先される）
+        start_iso = start_datetime.isoformat() + "Z"
+        end_iso = end_datetime.isoformat() + "Z"
+
         event = {
             "summary": f"BNI パスポート #{program_number} - {mentor_name} × {new_member_name}",
             "description": f"BNI 47∞チャプター パスポートプログラム #{program_number}\nメンター: {mentor_name}\n新メンバー: {new_member_name}",
             "start": {
-                "dateTime": start_datetime.isoformat(),
+                "dateTime": start_iso,
                 "timeZone": "Asia/Tokyo",
             },
             "end": {
-                "dateTime": end_datetime.isoformat(),
+                "dateTime": end_iso,
                 "timeZone": "Asia/Tokyo",
             },
             "attendees": [

@@ -98,17 +98,23 @@ async def get_assigned_new_members(
             bk = bookings_by_slot.get(s.id) if s.is_booked else None
             booked_mentor_name = None
             booked_program_number = None
+            booked_mentor_id = None
+            booking_id = None
             if bk:
                 if bk.mentor and bk.mentor.user:
                     booked_mentor_name = bk.mentor.user.name
+                    booked_mentor_id = bk.mentor.id
                 if bk.program:
                     booked_program_number = bk.program.number
+                booking_id = bk.id
             available_slots.append({
                 "id": s.id,
                 "start_datetime": s.start_datetime,
                 "is_booked": s.is_booked,
                 "booked_mentor_name": booked_mentor_name,
                 "booked_program_number": booked_program_number,
+                "booked_mentor_id": booked_mentor_id,
+                "booking_id": booking_id,
             })
 
         result.append({

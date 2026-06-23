@@ -7,6 +7,8 @@ interface Slot {
   is_booked: boolean;
   booked_mentor_name?: string | null;
   booked_program_number?: number | null;
+  booked_mentor_id?: number | null;
+  booking_id?: number | null;
 }
 
 interface NewMember {
@@ -20,6 +22,11 @@ interface Program {
   id: number;
   number: number;
   title: string;
+}
+
+interface MentorInfo {
+  id: number;
+  program: Program | null;
 }
 
 interface Props {
@@ -64,6 +71,7 @@ export default function Schedule({ currentUser }: Props) {
   const [newMembers, setNewMembers] = useState<NewMember[]>([]);
   const [selectedMember, setSelectedMember] = useState<NewMember | null>(null);
   const [myProgram, setMyProgram] = useState<Program | null>(null);
+  const [myMentorId, setMyMentorId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [bookingSlotId, setBookingSlotId] = useState<number | null>(null);
   const [error, setError] = useState("");
@@ -82,11 +90,16 @@ export default function Schedule({ currentUser }: Props) {
       } else {
         const [members, mentorInfo] = await Promise.all([
           api.get<NewMember[]>("/api/mentors/new-members"),
-          api.get<{ program: Program | null }>("/api/mentors/me"),
+          api.get<MentorInfo>("/api/mentors/me"),
         ]);
         setNewMembers(members);
         setMyProgram(mentorInfo.program);
-        if (members.length > 0) setSelectedMember(members[0]);
+        setMyMentorId(mentorInfo.id);
+        if (members.length > 0) {
+          // 同じメンバーが選択されていれば維持、なければ先頭
+          const keep = selectedMember && members.find((m) => m.id === selectedMember.id);
+          setSelectedMember(keep ?? members[0]);
+        }
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "データの取得に失敗しました");
@@ -127,10 +140,23 @@ export default function Schedule({ currentUser }: Props) {
     setBookingSlotId(slotId);
     try {
       await api.post("/api/bookings/", { slot_id: slotId, program_id: myProgram.id });
-      alert("予約が完了しました！メールで通知が送られます。");
+      alert("予約が完了しました!メールで通知が送られます。");
       await fetchData();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "予約に失敗しました");
+    } finally {
+      setBookingSlotId(null);
+    }
+  }
+
+  async function cancelBooking(bookingId: number, slotId: number) {
+    if (!confirm("この予約をキャンセルしますか?Google Calendarのイベントも削除されます。")) return;
+    setBookingSlotId(slotId);
+    try {
+      await api.delete(`/api/bookings/${bookingId}`);
+      await fetchData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "キャンセルに失敗しました");
     } finally {
       setBookingSlotId(null);
     }
@@ -278,14 +304,30 @@ export default function Schedule({ currentUser }: Props) {
                         const label = slot.booked_mentor_name
                           ? `${slot.booked_mentor_name}${slot.booked_program_number ? ` #${slot.booked_program_number}` : ""}`
                           : "予約済み";
+                        const isMine =
+                          currentUser.role === "admin" ||
+                          (myMentorId != null && slot.booked_mentor_id === myMentorId);
+                        const canCancel = isMine && slot.booking_id != null;
+                        const isLoading = bookingSlotId === slot.id;
                         return (
                           <td key={day.toISOString()} className="border-r h-10 p-0.5">
-                            <div
-                              title={label}
-                              className="w-full h-full bg-emerald-100 text-emerald-800 text-[10px] leading-tight rounded flex items-center justify-center px-1 text-center truncate"
-                            >
-                              {label}
-                            </div>
+                            {canCancel ? (
+                              <button
+                                onClick={() => cancelBooking(slot.booking_id!, slot.id)}
+                                disabled={isLoading}
+                                title={`クリックでキャンセル: ${label}`}
+                                className="w-full h-full bg-emerald-100 hover:bg-red-100 hover:text-red-700 text-emerald-800 text-[10px] leading-tight rounded flex items-center justify-center px-1 text-center truncate transition disabled:opacity-50"
+                              >
+                                {isLoading ? "..." : label}
+                              </button>
+                            ) : (
+                              <div
+                                title={label}
+                                className="w-full h-full bg-emerald-100 text-emerald-800 text-[10px] leading-tight rounded flex items-center justify-center px-1 text-center truncate"
+                              >
+                                {label}
+                              </div>
+                            )}
                           </td>
                         );
                       }

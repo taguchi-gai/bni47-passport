@@ -1,13 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 from database import get_db
 import models
 import auth as auth_utils
 from services.google_calendar import create_meet_event, delete_event
 from services.email_service import send_booking_notification, send_completion_notification
+
+JST = timezone(timedelta(hours=9))
+
+
+def _format_jst(dt: datetime) -> str:
+    """naive UTC datetime を JST 文字列に変換"""
+    aware_utc = dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+    return aware_utc.astimezone(JST).strftime("%Y年%m月%d日 %H:%M")
 
 router = APIRouter(prefix="/api/bookings", tags=["bookings"])
 
@@ -107,7 +115,7 @@ async def create_booking(
     db.commit()
     db.refresh(booking)
 
-    jst_datetime = slot.start_datetime.strftime("%Y年%m月%d日 %H:%M")
+    jst_datetime = _format_jst(slot.start_datetime)
     try:
         await send_booking_notification(
             mentor_name=mentor_user.name,
@@ -191,6 +199,42 @@ async def complete_booking(
         print(f"Email send error: {e}")
 
     return {"message": "完了しました", "completed_at": booking.completed_at}
+
+
+@router.delete("/{booking_id}")
+async def cancel_booking(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_mentor_or_admin),
+):
+    booking = (
+        db.query(models.Booking)
+        .options(joinedload(models.Booking.slot))
+        .filter(models.Booking.id == booking_id)
+        .first()
+    )
+    if not booking:
+        raise HTTPException(status_code=404, detail="予約が見つかりません")
+
+    # mentor は自分の予約のみキャンセル可、admin は全てキャンセル可
+    if current_user.role == models.RoleEnum.mentor:
+        if not current_user.mentor or current_user.mentor.id != booking.mentor_id:
+            raise HTTPException(status_code=403, detail="この予約をキャンセルする権限がありません")
+
+    # Google Calendar イベント削除（失敗しても続行）
+    if booking.google_event_id and booking.google_event_id != "dummy":
+        try:
+            delete_event(booking.google_event_id)
+        except Exception as e:
+            print(f"Calendar delete error: {e}")
+
+    # スロットを未予約に戻す
+    if booking.slot:
+        booking.slot.is_booked = False
+
+    db.delete(booking)
+    db.commit()
+    return {"message": "キャンセルしました"}
 
 
 @router.get("/")
