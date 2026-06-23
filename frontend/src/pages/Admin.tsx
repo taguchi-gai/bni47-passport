@@ -84,6 +84,15 @@ export default function Admin() {
     }
   }
 
+  async function handleChangeRole(userId: number, role: string) {
+    try {
+      await api.put(`/api/admin/members/${userId}`, { role });
+      await fetchAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "ロール変更に失敗しました");
+    }
+  }
+
   async function handleUpdateProgramMentor(programId: number, mentorId: string) {
     try {
       await api.put(`/api/admin/programs/${programId}`, { mentor_id: mentorId ? Number(mentorId) : null });
@@ -119,7 +128,6 @@ export default function Admin() {
 
   if (loading) return <div className="flex items-center justify-center h-64 text-gray-500">読み込み中...</div>;
 
-  const newMembers = members.filter((m) => m.role === "new_member");
   const mentorMembers = members.filter((m) => m.role === "mentor" || m.role === "admin");
 
   return (
@@ -153,19 +161,20 @@ export default function Admin() {
           <div className="bg-white rounded-xl shadow overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b">
               <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                <span>👥</span> 新メンバー（入会登録）
+                <span>👥</span> メンバー一覧（ロール変更）
               </h2>
+              <p className="text-xs text-gray-500">ロール列で「新メンバー / メンター / 管理者」を切替できます</p>
             </div>
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  {["メンバー氏名", "通知用GMAIL", "FACEBOOK", "完了状況", ""].map((h) => (
+                  {["氏名", "通知用GMAIL", "FACEBOOK", "ロール", "完了状況", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {newMembers.map((m) => (
+                {members.map((m) => (
                   <tr key={m.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900 text-sm">{m.name}</td>
                     <td className="px-4 py-3 text-sm text-gray-500">{m.email}</td>
@@ -176,7 +185,18 @@ export default function Admin() {
                         </a>
                       ) : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">—/10</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={m.role}
+                        onChange={(e) => handleChangeRole(m.id, e.target.value)}
+                        className="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      >
+                        <option value="new_member">新メンバー</option>
+                        <option value="mentor">メンター</option>
+                        <option value="admin">管理者</option>
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{m.role === "new_member" ? "—/10" : "—"}</td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => handleDeleteMember(m.id)}

@@ -169,7 +169,14 @@ async def update_member(
     if req.is_active is not None:
         user.is_active = req.is_active
     if req.role is not None:
-        user.role = models.RoleEnum(req.role)
+        new_role = models.RoleEnum(req.role)
+        if user.role != new_role:
+            # 新しい role に必要なサブテーブル行を作成（既存なら何もしない）
+            if new_role in (models.RoleEnum.mentor, models.RoleEnum.admin) and not user.mentor:
+                db.add(models.Mentor(user_id=user.id))
+            if new_role == models.RoleEnum.new_member and not user.new_member:
+                db.add(models.NewMember(user_id=user.id))
+            user.role = new_role
 
     if req.facebook_url is not None and user.new_member:
         user.new_member.facebook_url = req.facebook_url
