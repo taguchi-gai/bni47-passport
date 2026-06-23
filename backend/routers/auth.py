@@ -94,13 +94,8 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
     )
 
 
-@router.get("/google")
-async def google_auth_url():
-    """メンター用Google認証URL生成"""
-    if not GOOGLE_CLIENT_ID:
-        raise HTTPException(status_code=500, detail="Google OAuth未設定")
-
-    flow = Flow.from_client_config(
+def _build_flow():
+    return Flow.from_client_config(
         {
             "web": {
                 "client_id": GOOGLE_CLIENT_ID,
@@ -112,6 +107,15 @@ async def google_auth_url():
         },
         scopes=SCOPES,
     )
+
+
+@router.get("/google")
+async def google_auth_url():
+    """Google認証URL生成（ログイン・登録共通）"""
+    if not GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=500, detail="Google OAuth未設定")
+
+    flow = _build_flow()
     flow.redirect_uri = GOOGLE_REDIRECT_URI
 
     auth_url, _ = flow.authorization_url(
@@ -124,22 +128,13 @@ async def google_auth_url():
 
 @router.get("/google/callback")
 async def google_callback(code: str, db: Session = Depends(get_db)):
-    """Google OAuth コールバック"""
+    """Google OAuth コールバック - フロントエンドへリダイレクトしてトークンを渡す"""
+    from fastapi.responses import RedirectResponse
+
     if not GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=500, detail="Google OAuth未設定")
 
-    flow = Flow.from_client_config(
-        {
-            "web": {
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "redirect_uris": [GOOGLE_REDIRECT_URI],
-            }
-        },
-        scopes=SCOPES,
-    )
+    flow = _build_flow()
     flow.redirect_uri = GOOGLE_REDIRECT_URI
     flow.fetch_token(code=code)
 
@@ -152,26 +147,24 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
 
     user = db.query(models.User).filter(models.User.email == email).first()
     if not user:
-        user = models.User(
-            name=name,
-            email=email,
-            role=models.RoleEnum.mentor,
-        )
+        # 新規ユーザーは new_member として作成（責任者が後でロール変更可）
+        user = models.User(name=name, email=email, role=models.RoleEnum.new_member)
         db.add(user)
         db.flush()
-
-        mentor = models.Mentor(user_id=user.id)
-        db.add(mentor)
+        db.add(models.NewMember(user_id=user.id))
         db.commit()
         db.refresh(user)
-    elif not user.mentor:
-        user.role = models.RoleEnum.mentor
-        mentor = models.Mentor(user_id=user.id)
-        db.add(mentor)
-        db.commit()
 
     token = auth_utils.create_access_token({"sub": str(user.id)})
-    return {"access_token": token, "token_type": "bearer", "redirect": f"{FRONTEND_URL}/mentor/setup"}
+    # フロントエンドに ?token=... 付きでリダイレクト
+    import urllib.parse
+    params = urllib.parse.urlencode({
+        "token": token,
+        "role": user.role.value,
+        "name": user.name,
+        "user_id": user.id,
+    })
+    return RedirectResponse(url=f"{FRONTEND_URL}/?{params}#auth-callback")
 
 
 @router.get("/me")
