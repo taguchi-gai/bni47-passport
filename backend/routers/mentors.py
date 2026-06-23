@@ -75,6 +75,7 @@ async def get_assigned_new_members(
         )
         .join(models.User, models.NewMember.user_id == models.User.id)
         .filter(models.User.is_active == True)
+        .filter(models.User.role == models.RoleEnum.new_member)
         .all()
     )
 

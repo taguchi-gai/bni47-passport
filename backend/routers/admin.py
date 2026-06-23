@@ -40,9 +40,15 @@ async def get_dashboard(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user),
 ):
-    nm_query = db.query(models.NewMember).options(
-        joinedload(models.NewMember.user),
-        joinedload(models.NewMember.bookings).joinedload(models.Booking.program),
+    nm_query = (
+        db.query(models.NewMember)
+        .join(models.User, models.NewMember.user_id == models.User.id)
+        .options(
+            joinedload(models.NewMember.user),
+            joinedload(models.NewMember.bookings).joinedload(models.Booking.program),
+        )
+        .filter(models.User.is_active == True)
+        .filter(models.User.role == models.RoleEnum.new_member)
     )
     if current_user.role == models.RoleEnum.new_member:
         if not current_user.new_member:
