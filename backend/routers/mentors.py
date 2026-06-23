@@ -71,6 +71,7 @@ async def get_assigned_new_members(
             joinedload(models.NewMember.user),
             joinedload(models.NewMember.availability_slots),
             joinedload(models.NewMember.bookings).joinedload(models.Booking.program),
+            joinedload(models.NewMember.bookings).joinedload(models.Booking.mentor).joinedload(models.Mentor.user),
         )
         .join(models.User, models.NewMember.user_id == models.User.id)
         .filter(models.User.is_active == True)
@@ -90,15 +91,24 @@ async def get_assigned_new_members(
                 b.program_id == program.id for b in nm.bookings
             )
 
-        available_slots = [
-            {
+        bookings_by_slot = {b.slot_id: b for b in nm.bookings}
+        available_slots = []
+        for s in nm.availability_slots:
+            bk = bookings_by_slot.get(s.id) if s.is_booked else None
+            booked_mentor_name = None
+            booked_program_number = None
+            if bk:
+                if bk.mentor and bk.mentor.user:
+                    booked_mentor_name = bk.mentor.user.name
+                if bk.program:
+                    booked_program_number = bk.program.number
+            available_slots.append({
                 "id": s.id,
                 "start_datetime": s.start_datetime,
                 "is_booked": s.is_booked,
-            }
-            for s in nm.availability_slots
-            if not s.is_booked
-        ]
+                "booked_mentor_name": booked_mentor_name,
+                "booked_program_number": booked_program_number,
+            })
 
         result.append({
             "id": nm.id,

@@ -5,6 +5,8 @@ interface Slot {
   id: number;
   start_datetime: string;
   is_booked: boolean;
+  booked_mentor_name?: string | null;
+  booked_program_number?: number | null;
 }
 
 interface NewMember {
@@ -263,16 +265,38 @@ export default function Schedule({ currentUser }: Props) {
                         );
                       }
 
-                      if (!slot || slot.is_booked) {
+                      if (!slot) {
                         return <td key={day.toISOString()} className="border-r h-10 bg-gray-50" />;
                       }
 
+                      if (slot.is_booked) {
+                        const label = slot.booked_mentor_name
+                          ? `${slot.booked_mentor_name}${slot.booked_program_number ? ` #${slot.booked_program_number}` : ""}`
+                          : "予約済み";
+                        return (
+                          <td key={day.toISOString()} className="border-r h-10 p-0.5">
+                            <div
+                              title={label}
+                              className="w-full h-full bg-emerald-100 text-emerald-800 text-[10px] leading-tight rounded flex items-center justify-center px-1 text-center truncate"
+                            >
+                              {label}
+                            </div>
+                          </td>
+                        );
+                      }
+
+                      const isDisabled = bookingSlotId === slot.id || selectedMember?.already_booked;
                       return (
                         <td key={day.toISOString()} className="border-r h-10 p-0.5">
                           <button
                             onClick={() => bookSlot(slot.id)}
-                            disabled={bookingSlotId === slot.id || selectedMember?.already_booked}
-                            className="w-full h-full bg-indigo-500 hover:bg-indigo-600 text-white text-xs rounded disabled:opacity-50 transition"
+                            disabled={isDisabled}
+                            title="この枠を予約する"
+                            className={`w-full h-full text-xs rounded transition ${
+                              isDisabled
+                                ? "bg-indigo-100 text-indigo-300 cursor-not-allowed"
+                                : "bg-indigo-50 hover:bg-indigo-500 hover:text-white text-transparent hover:text-white"
+                            }`}
                           >
                             {bookingSlotId === slot.id ? "..." : "予約"}
                           </button>
