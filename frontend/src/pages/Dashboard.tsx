@@ -92,6 +92,7 @@ export default function Dashboard({ currentUser }: Props) {
     (p) => p.mentor_name === currentUser.name
   );
 
+  const isAdmin = currentUser.role === "admin";
   const isNewMember = currentUser.role === "new_member";
   // 新メンバーの場合、バックは自分のデータのみ返すので members[0] が自分
   const me = isNewMember && data.members.length > 0 ? data.members[0] : null;
@@ -159,7 +160,7 @@ export default function Dashboard({ currentUser }: Props) {
                   </td>
                   {data.programs.map((p) => {
                     const booking = member.bookings[p.number];
-                    const isMyProgram = myMentorProgram?.number === p.number;
+                    const isMyProgram = isAdmin || myMentorProgram?.number === p.number;
 
                     if (!booking) {
                       return (
