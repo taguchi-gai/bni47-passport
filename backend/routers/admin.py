@@ -38,16 +38,17 @@ class MentorUpdate(BaseModel):
 @router.get("/dashboard")
 async def get_dashboard(
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.require_mentor_or_admin),
+    current_user: models.User = Depends(auth_utils.get_current_user),
 ):
-    new_members = (
-        db.query(models.NewMember)
-        .options(
-            joinedload(models.NewMember.user),
-            joinedload(models.NewMember.bookings).joinedload(models.Booking.program),
-        )
-        .all()
+    nm_query = db.query(models.NewMember).options(
+        joinedload(models.NewMember.user),
+        joinedload(models.NewMember.bookings).joinedload(models.Booking.program),
     )
+    if current_user.role == models.RoleEnum.new_member:
+        if not current_user.new_member:
+            raise HTTPException(status_code=400, detail="新メンバー情報がありません")
+        nm_query = nm_query.filter(models.NewMember.id == current_user.new_member.id)
+    new_members = nm_query.all()
 
     programs = (
         db.query(models.Program)

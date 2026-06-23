@@ -47,6 +47,13 @@ function sameHour(a: Date, b: Date) {
   return sameDay(a, b) && a.getHours() === b.getHours();
 }
 
+// バックエンドは naive datetime を UTC として保存・返却するため、
+// "Z" がない ISO 文字列に Z を補って UTC として解釈させる
+function parseServerDate(s: string): Date {
+  if (!s) return new Date(NaN);
+  return /[Zz]|[+-]\d{2}:?\d{2}$/.test(s) ? new Date(s) : new Date(s + "Z");
+}
+
 const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
 export default function Schedule({ currentUser }: Props) {
@@ -94,7 +101,7 @@ export default function Schedule({ currentUser }: Props) {
     dt.setHours(hour, 0, 0, 0);
     const dtStr = dt.toISOString();
 
-    const existing = mySlots.find((s) => sameHour(new Date(s.start_datetime), dt));
+    const existing = mySlots.find((s) => sameHour(parseServerDate(s.start_datetime), dt));
     if (existing) {
       if (existing.is_booked) return;
       try {
@@ -128,7 +135,7 @@ export default function Schedule({ currentUser }: Props) {
   }
 
   function getSlotForCell(day: Date, hour: number, slots: Slot[]) {
-    return slots.find((s) => sameHour(new Date(s.start_datetime), (() => {
+    return slots.find((s) => sameHour(parseServerDate(s.start_datetime), (() => {
       const d = new Date(day); d.setHours(hour, 0, 0, 0); return d;
     })()));
   }

@@ -68,7 +68,9 @@ export default function Dashboard({ currentUser }: Props) {
 
   function formatDate(dt: string | null) {
     if (!dt) return "";
-    const d = new Date(dt);
+    // バックは naive datetime を UTC として保存・返却するので、Z を補ってパース
+    const iso = /[Zz]|[+-]\d{2}:?\d{2}$/.test(dt) ? dt : dt + "Z";
+    const d = new Date(iso);
     return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   }
 
@@ -90,15 +92,46 @@ export default function Dashboard({ currentUser }: Props) {
     (p) => p.mentor_name === currentUser.name
   );
 
+  const isNewMember = currentUser.role === "new_member";
+  // 新メンバーの場合、バックは自分のデータのみ返すので members[0] が自分
+  const me = isNewMember && data.members.length > 0 ? data.members[0] : null;
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">ダッシュボード</h1>
-          <p className="text-gray-500 text-sm mt-1">プログラム進捗と予定されているメンター面談の日程を確認できます</p>
+          <p className="text-gray-500 text-sm mt-1">
+            {isNewMember
+              ? "あなたのプログラム進捗と予定されているメンター面談の日程を確認できます"
+              : "プログラム進捗と予定されているメンター面談の日程を確認できます"}
+          </p>
         </div>
         <div className="text-sm text-gray-500">第12期</div>
       </div>
+
+      {isNewMember && me && (
+        <div className="mb-6 bg-white rounded-xl shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{me.name}</h2>
+              <p className="text-sm text-gray-500">あなたの進捗</p>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-indigo-600">
+                {me.completed_count}<span className="text-base text-gray-400"> / {me.total_count}</span>
+              </div>
+              <div className="text-xs text-gray-500">完了済みプログラム</div>
+            </div>
+          </div>
+          <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-indigo-500 h-full transition-all"
+              style={{ width: `${(me.completed_count / Math.max(me.total_count, 1)) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow overflow-hidden">
         <div className="overflow-x-auto">
