@@ -15,7 +15,7 @@ interface User {
   role: string;
 }
 
-type Page = "dashboard" | "schedule" | "admin";
+type Page = "dashboard" | "schedule" | "admin" | "mentor_setup";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -112,6 +112,9 @@ export default function App() {
         {page === "dashboard" && <Dashboard currentUser={user} />}
         {page === "schedule" && <Schedule currentUser={user} />}
         {page === "admin" && user.role === "admin" && <Admin />}
+        {page === "mentor_setup" && (user.role === "mentor" || user.role === "admin") && (
+          <MentorSetup embedded onDone={() => setPage("dashboard")} />
+        )}
       </main>
     </div>
   );

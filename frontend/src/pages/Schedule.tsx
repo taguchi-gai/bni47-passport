@@ -151,6 +151,11 @@ export default function Schedule({ currentUser }: Props) {
         {isNewMember ? "空いている時間をクリックして選択してください" : "新メンバーの空き時間を確認し、1つ予約してください"}
       </p>
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>}
+      {isMentor && !myProgram && (
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded text-amber-800 text-sm">
+          あなたは現在どのプログラムにも割り当てられていません。予約するには、管理者に「プログラム担当」を割り当ててもらってください。
+        </div>
+      )}
 
       <div className="flex gap-6">
         {isMentor && (

@@ -1,26 +1,42 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { api } from "../api/client";
 
 interface Props {
   onDone: () => void;
+  embedded?: boolean;
 }
 
-export default function MentorSetup({ onDone }: Props) {
+export default function MentorSetup({ onDone, embedded = false }: Props) {
   const [zoomUrl, setZoomUrl] = useState("");
   const [preferredMeeting, setPreferredMeeting] = useState("google_meet");
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    api.get<{ zoom_url: string | null; preferred_meeting: string }>("/api/mentors/me")
+      .then((data) => {
+        if (data.zoom_url) setZoomUrl(data.zoom_url);
+        if (data.preferred_meeting) setPreferredMeeting(data.preferred_meeting);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
       await api.put("/api/mentors/me/setup", {
         zoom_url: zoomUrl || null,
         preferred_meeting: preferredMeeting,
       });
-      onDone();
+      if (embedded) {
+        setSuccess("設定を保存しました");
+      } else {
+        onDone();
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "エラーが発生しました");
     } finally {
@@ -28,9 +44,16 @@ export default function MentorSetup({ onDone }: Props) {
     }
   }
 
+  const containerClass = embedded
+    ? "p-6"
+    : "min-h-screen bg-gray-50 flex items-center justify-center";
+  const cardClass = embedded
+    ? "bg-white rounded-xl shadow p-8 w-full max-w-md"
+    : "bg-white rounded-xl shadow p-8 w-full max-w-md";
+
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-      <div className="bg-white rounded-xl shadow p-8 w-full max-w-md">
+    <div className={containerClass}>
+      <div className={cardClass}>
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-lg">
             47
@@ -44,6 +67,9 @@ export default function MentorSetup({ onDone }: Props) {
         <p className="text-sm text-gray-500 mb-6">面談で使用する会議ツールを選択してください。</p>
         {error && (
           <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">{error}</div>
+        )}
+        {success && (
+          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded text-emerald-700 text-sm">{success}</div>
         )}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -97,7 +123,7 @@ export default function MentorSetup({ onDone }: Props) {
             disabled={loading}
             className="w-full bg-indigo-600 text-white py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 transition"
           >
-            {loading ? "保存中..." : "設定を保存してダッシュボードへ"}
+            {loading ? "保存中..." : embedded ? "設定を保存" : "設定を保存してダッシュボードへ"}
           </button>
         </form>
       </div>

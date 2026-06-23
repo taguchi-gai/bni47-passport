@@ -10,6 +10,10 @@ const navItems = [
   { key: "schedule", label: "スケジュール調整", icon: "📅" },
 ];
 
+const mentorItems = [
+  { key: "mentor_setup", label: "メンター設定", icon: "🎧" },
+];
+
 const adminItems = [
   { key: "admin", label: "管理・設定", icon: "⚙️" },
 ];
@@ -28,6 +32,7 @@ const ROLE_COLORS: Record<string, string> = {
 
 export default function Sidebar({ currentPage, onNavigate, user, onLogout }: Props) {
   const showAdmin = user.role === "admin";
+  const showMentor = user.role === "mentor" || user.role === "admin";
   const showSchedule = user.role !== "new_member" || true;
 
   return (
@@ -62,6 +67,28 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }: Pro
             </button>
           );
         })}
+
+        {showMentor && (
+          <>
+            <div className="pt-2 pb-1">
+              <p className="text-xs font-semibold text-gray-400 px-3 uppercase tracking-wide">メンター</p>
+            </div>
+            {mentorItems.map((item) => (
+              <button
+                key={item.key}
+                onClick={() => onNavigate(item.key)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
+                  currentPage === item.key
+                    ? "bg-indigo-600 text-white"
+                    : "text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                <span>{item.icon}</span>
+                {item.label}
+              </button>
+            ))}
+          </>
+        )}
 
         {showAdmin && (
           <>
