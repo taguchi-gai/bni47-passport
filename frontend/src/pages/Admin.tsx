@@ -93,6 +93,21 @@ export default function Admin() {
     }
   }
 
+  async function handleProgramMentorByName(programId: number, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      await handleUpdateProgramMentor(programId, "");
+      return;
+    }
+    const match = mentors.find((m) => m.name === trimmed);
+    if (match) {
+      await handleUpdateProgramMentor(programId, String(match.id));
+    } else {
+      alert(`「${trimmed}」というメンターが登録されていません。\n先に「新メンバー管理」タブの追加フォームでロール「メンター」を選んで登録してください。`);
+      await fetchAll();
+    }
+  }
+
   async function handleUpdateMentorSetting(mentorId: number, field: string, value: string) {
     try {
       await api.put(`/api/admin/mentors/${mentorId}`, { [field]: value || null });
@@ -175,7 +190,8 @@ export default function Admin() {
               </tbody>
             </table>
             <div className="px-6 py-4 border-t bg-gray-50">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">+ 新規入会メンバーを追加</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-1">+ メンバー追加</h3>
+              <p className="text-xs text-gray-500 mb-3">ロールから「新メンバー / メンター / 管理者」を選択できます。メンター候補もここから登録してください。</p>
               <form onSubmit={handleAddMember} className="flex gap-3 flex-wrap">
                 <input
                   placeholder="氏名"
@@ -222,9 +238,14 @@ export default function Admin() {
 
       {tab === "programs" && (
         <div className="bg-white rounded-xl shadow overflow-hidden">
+          <datalist id="mentor-name-list">
+            {mentors.map((m) => (
+              <option key={m.id} value={m.name} />
+            ))}
+          </datalist>
           <div className="px-6 py-4 border-b">
             <h2 className="font-semibold text-gray-900">プログラム担当・メンター変更（期の交替）</h2>
-            <p className="text-xs text-gray-500 mt-1">変更すると最終更新日が記録されます</p>
+            <p className="text-xs text-gray-500 mt-1">メンター名を入力（候補リストから選択も可能）。先にメンター登録が必要です。</p>
           </div>
           <table className="min-w-full">
             <thead className="bg-gray-50">
@@ -242,16 +263,16 @@ export default function Admin() {
                     <p className="text-sm text-gray-700 mt-0.5 line-clamp-1">{p.title}</p>
                   </td>
                   <td className="px-4 py-3">
-                    <select
-                      value={p.mentor_id ?? ""}
-                      onChange={(e) => handleUpdateProgramMentor(p.id, e.target.value)}
-                      className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    >
-                      <option value="">未設定</option>
-                      {mentors.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
+                    <input
+                      list="mentor-name-list"
+                      defaultValue={mentors.find((m) => m.id === p.mentor_id)?.name ?? ""}
+                      onBlur={(e) => handleProgramMentorByName(p.id, e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur();
+                      }}
+                      placeholder="メンター名を入力"
+                      className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48"
+                    />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
                     {mentorMembers.find((m) => m.mentor_id === p.mentor_id)?.email ?? "—"}

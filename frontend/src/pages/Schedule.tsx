@@ -291,14 +291,14 @@ export default function Schedule({ currentUser }: Props) {
                           <button
                             onClick={() => bookSlot(slot.id)}
                             disabled={isDisabled}
-                            title="この枠を予約する"
+                            title={selectedMember?.already_booked ? "このメンバーは既に予約済みです" : "この枠を予約する"}
                             className={`w-full h-full text-xs rounded transition ${
                               isDisabled
-                                ? "bg-indigo-100 text-indigo-300 cursor-not-allowed"
-                                : "bg-indigo-50 hover:bg-indigo-500 hover:text-white text-transparent hover:text-white"
+                                ? "bg-indigo-200 cursor-not-allowed"
+                                : "bg-indigo-500 hover:bg-indigo-600"
                             }`}
                           >
-                            {bookingSlotId === slot.id ? "..." : "予約"}
+                            {bookingSlotId === slot.id ? <span className="text-white">…</span> : ""}
                           </button>
                         </td>
                       );

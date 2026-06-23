@@ -182,20 +182,19 @@ export default function Dashboard({ currentUser }: Props) {
                     }
 
                     return (
-                      <td key={p.id} className="px-3 py-3 text-center">
+                      <td key={p.id} className="px-3 py-3 text-center relative">
+                        {isMyProgram && (
+                          <button
+                            onClick={() => handleComplete(booking.booking_id)}
+                            disabled={completing === booking.booking_id}
+                            title="クリックで完了にする"
+                            className="absolute top-1.5 right-1.5 w-4 h-4 border-2 border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 rounded disabled:opacity-50"
+                          />
+                        )}
                         <div className="flex flex-col items-center gap-1">
                           <div className="bg-indigo-100 text-indigo-700 rounded px-2 py-0.5 text-xs font-medium">
                             {formatDate(booking.start_datetime)}
                           </div>
-                          {isMyProgram && (
-                            <button
-                              onClick={() => handleComplete(booking.booking_id)}
-                              disabled={completing === booking.booking_id}
-                              className="text-xs text-emerald-600 hover:text-emerald-700 underline disabled:opacity-50"
-                            >
-                              {completing === booking.booking_id ? "..." : "完了"}
-                            </button>
-                          )}
                           {booking.meeting_url && (
                             <a
                               href={booking.meeting_url}
