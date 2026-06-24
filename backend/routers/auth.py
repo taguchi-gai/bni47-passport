@@ -43,26 +43,45 @@ class LoginResponse(BaseModel):
 
 @router.post("/register")
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(models.User).filter(models.User.email == req.email).first():
+    existing = db.query(models.User).filter(models.User.email == req.email).first()
+    if existing and existing.is_active:
         raise HTTPException(status_code=400, detail="このメールアドレスは既に登録されています")
 
-    user = models.User(
-        name=req.name,
-        email=req.email,
-        password_hash=auth_utils.get_password_hash(req.password),
-        role=models.RoleEnum.new_member,
-    )
-    db.add(user)
-    db.flush()
+    if existing and not existing.is_active:
+        # 過去に削除（無効化）されたアカウントを再有効化する
+        existing.name = req.name
+        existing.password_hash = auth_utils.get_password_hash(req.password)
+        existing.role = models.RoleEnum.new_member
+        existing.is_active = True
+        if not existing.new_member:
+            db.add(models.NewMember(
+                user_id=existing.id,
+                facebook_url=req.facebook_url,
+                program_term=12,
+            ))
+        else:
+            existing.new_member.facebook_url = req.facebook_url
+        db.commit()
+        db.refresh(existing)
+        user = existing
+    else:
+        user = models.User(
+            name=req.name,
+            email=req.email,
+            password_hash=auth_utils.get_password_hash(req.password),
+            role=models.RoleEnum.new_member,
+        )
+        db.add(user)
+        db.flush()
 
-    member = models.NewMember(
-        user_id=user.id,
-        facebook_url=req.facebook_url,
-        program_term=12,
-    )
-    db.add(member)
-    db.commit()
-    db.refresh(user)
+        member = models.NewMember(
+            user_id=user.id,
+            facebook_url=req.facebook_url,
+            program_term=12,
+        )
+        db.add(member)
+        db.commit()
+        db.refresh(user)
 
     token = auth_utils.create_access_token({"sub": str(user.id)})
     return LoginResponse(
