@@ -171,6 +171,12 @@ async def complete_booking(
         if not current_user.mentor or current_user.mentor.id != booking.mentor_id:
             raise HTTPException(status_code=403, detail="この予約を完了にする権限がありません")
 
+    if booking.slot and booking.slot.start_datetime > datetime.utcnow():
+        raise HTTPException(
+            status_code=400,
+            detail="予約日時が経過してから完了マークできます",
+        )
+
     booking.is_completed = True
     booking.completed_at = datetime.utcnow()
     db.commit()

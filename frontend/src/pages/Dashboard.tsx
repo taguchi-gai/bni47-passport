@@ -182,14 +182,26 @@ export default function Dashboard({ currentUser }: Props) {
                       );
                     }
 
+                    const startDate = booking.start_datetime
+                      ? new Date(
+                          /[Zz]|[+-]\d{2}:?\d{2}$/.test(booking.start_datetime)
+                            ? booking.start_datetime
+                            : booking.start_datetime + "Z"
+                        )
+                      : null;
+                    const isFuture = startDate ? startDate > new Date() : false;
                     return (
                       <td key={p.id} className="px-3 py-3 text-center relative">
                         {isMyProgram && (
                           <button
                             onClick={() => handleComplete(booking.booking_id)}
-                            disabled={completing === booking.booking_id}
-                            title="クリックで完了にする"
-                            className="absolute top-1.5 right-1.5 w-4 h-4 border-2 border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 rounded disabled:opacity-50"
+                            disabled={completing === booking.booking_id || isFuture}
+                            title={isFuture ? "予約日時が経過してから完了マークできます" : "クリックで完了にする"}
+                            className={`absolute top-1.5 right-1.5 w-4 h-4 border-2 rounded disabled:cursor-not-allowed ${
+                              isFuture
+                                ? "border-gray-200 bg-gray-50 opacity-50"
+                                : "border-gray-300 hover:border-emerald-500 hover:bg-emerald-50 disabled:opacity-50"
+                            }`}
                           />
                         )}
                         <div className="flex flex-col items-center gap-1">
