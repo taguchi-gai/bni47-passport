@@ -96,9 +96,12 @@ export default function Schedule({ currentUser }: Props) {
         setMyProgram(mentorInfo.program);
         setMyMentorId(mentorInfo.id);
         if (members.length > 0) {
-          // 同じメンバーが選択されていれば維持、なければ先頭
-          const keep = selectedMember && members.find((m) => m.id === selectedMember.id);
-          setSelectedMember(keep ?? members[0]);
+          // 関数形式で stale closure を回避（fetchData は古い selectedMember を参照しがち）
+          setSelectedMember((prev) => {
+            if (!prev) return members[0];
+            const found = members.find((m) => m.id === prev.id);
+            return found ?? members[0];
+          });
         }
       }
     } catch (err: unknown) {
@@ -140,12 +143,13 @@ export default function Schedule({ currentUser }: Props) {
     setBookingSlotId(slotId);
     try {
       await api.post("/api/bookings/", { slot_id: slotId, program_id: myProgram.id });
-      alert("予約が完了しました!メールで通知が送られます。");
+      // alert の前に画面を更新（alert はモーダルでレンダリングをブロックするため）
       await fetchData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "予約に失敗しました");
-    } finally {
       setBookingSlotId(null);
+      alert("予約が完了しました。メールで通知が送られます。");
+    } catch (err: unknown) {
+      setBookingSlotId(null);
+      alert(err instanceof Error ? err.message : "予約に失敗しました");
     }
   }
 
@@ -155,10 +159,10 @@ export default function Schedule({ currentUser }: Props) {
     try {
       await api.delete(`/api/bookings/${bookingId}`);
       await fetchData();
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "キャンセルに失敗しました");
-    } finally {
       setBookingSlotId(null);
+    } catch (err: unknown) {
+      setBookingSlotId(null);
+      alert(err instanceof Error ? err.message : "キャンセルに失敗しました");
     }
   }
 

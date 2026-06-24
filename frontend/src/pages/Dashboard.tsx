@@ -56,10 +56,36 @@ export default function Dashboard({ currentUser }: Props) {
 
   async function handleComplete(bookingId: number) {
     setCompleting(bookingId);
+    // 楽観的更新: サーバー応答前にローカル state を即座に反転
+    setData((prev) => {
+      if (!prev) return prev;
+      const members = prev.members.map((m) => {
+        const updatedBookings: Record<number, BookingInfo> = {};
+        let changed = false;
+        for (const [k, b] of Object.entries(m.bookings)) {
+          if (b.booking_id === bookingId) {
+            updatedBookings[Number(k)] = {
+              ...b,
+              is_completed: !b.is_completed,
+              completed_at: !b.is_completed ? new Date().toISOString() : null,
+            };
+            changed = true;
+          } else {
+            updatedBookings[Number(k)] = b;
+          }
+        }
+        if (!changed) return m;
+        const completed_count = Object.values(updatedBookings).filter((b) => b.is_completed).length;
+        return { ...m, bookings: updatedBookings, completed_count };
+      });
+      return { ...prev, members };
+    });
     try {
       await api.patch(`/api/bookings/${bookingId}/complete`);
       await fetchData();
     } catch (err: unknown) {
+      // 失敗時は再取得して元に戻す
+      await fetchData();
       alert(err instanceof Error ? err.message : "エラーが発生しました");
     } finally {
       setCompleting(null);
