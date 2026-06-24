@@ -93,6 +93,24 @@ export default function Admin() {
     }
   }
 
+  async function handleResetPassword(userId: number, name: string) {
+    const newPassword = prompt(
+      `「${name}」さんの新しいパスワードを入力してください（6文字以上）。\nこのパスワードをご本人にお伝えください。`,
+      ""
+    );
+    if (!newPassword) return;
+    if (newPassword.length < 6) {
+      alert("パスワードは6文字以上にしてください");
+      return;
+    }
+    try {
+      await api.put(`/api/admin/members/${userId}/password`, { new_password: newPassword });
+      alert(`パスワードをリセットしました。\n新しいパスワード: ${newPassword}\nご本人にお伝えください。`);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "パスワードリセットに失敗しました");
+    }
+  }
+
   async function handleUpdateProgramMentor(programId: number, mentorId: string) {
     try {
       await api.put(`/api/admin/programs/${programId}`, { mentor_id: mentorId ? Number(mentorId) : null });
@@ -198,12 +216,21 @@ export default function Admin() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{m.role === "new_member" ? "—/10" : "—"}</td>
                     <td className="px-4 py-3">
-                      <button
-                        onClick={() => handleDeleteMember(m.id)}
-                        className="text-red-400 hover:text-red-600 text-xs"
-                      >
-                        削除
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => handleResetPassword(m.id, m.name)}
+                          className="text-indigo-500 hover:text-indigo-700 text-xs"
+                          title="パスワードをリセット（再発行）"
+                        >
+                          PW再発行
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMember(m.id)}
+                          className="text-red-400 hover:text-red-600 text-xs"
+                        >
+                          削除
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

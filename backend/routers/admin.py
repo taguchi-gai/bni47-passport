@@ -24,6 +24,10 @@ class MemberUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class PasswordReset(BaseModel):
+    new_password: str
+
+
 class ProgramUpdate(BaseModel):
     mentor_id: Optional[int] = None
     title: Optional[str] = None
@@ -189,6 +193,23 @@ async def update_member(
 
     db.commit()
     return {"message": "更新しました"}
+
+
+@router.put("/members/{user_id}/password")
+async def reset_member_password(
+    user_id: int,
+    req: PasswordReset,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_admin),
+):
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="パスワードは6文字以上にしてください")
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="ユーザーが見つかりません")
+    user.password_hash = auth_utils.get_password_hash(req.new_password)
+    db.commit()
+    return {"message": "パスワードをリセットしました"}
 
 
 @router.delete("/members/{user_id}")
