@@ -171,40 +171,50 @@ async def complete_booking(
         if not current_user.mentor or current_user.mentor.id != booking.mentor_id:
             raise HTTPException(status_code=403, detail="この予約を完了にする権限がありません")
 
-    if booking.slot and booking.slot.start_datetime > datetime.utcnow():
-        raise HTTPException(
-            status_code=400,
-            detail="予約日時が経過してから完了マークできます",
-        )
+    will_complete = not booking.is_completed
 
-    booking.is_completed = True
-    booking.completed_at = datetime.utcnow()
+    if will_complete:
+        if booking.slot and booking.slot.start_datetime > datetime.utcnow():
+            raise HTTPException(
+                status_code=400,
+                detail="予約日時が経過してから完了マークできます",
+            )
+        booking.is_completed = True
+        booking.completed_at = datetime.utcnow()
+    else:
+        booking.is_completed = False
+        booking.completed_at = None
     db.commit()
 
-    new_member = booking.new_member
-    completed_count = (
-        db.query(models.Booking)
-        .filter(
-            models.Booking.new_member_id == new_member.id,
-            models.Booking.is_completed == True,
+    if will_complete:
+        new_member = booking.new_member
+        completed_count = (
+            db.query(models.Booking)
+            .filter(
+                models.Booking.new_member_id == new_member.id,
+                models.Booking.is_completed == True,
+            )
+            .count()
         )
-        .count()
-    )
 
-    try:
-        await send_completion_notification(
-            new_member_name=new_member.user.name,
-            new_member_email=new_member.user.email,
-            program_number=booking.program.number,
-            program_title=booking.program.title,
-            mentor_name=booking.mentor.user.name,
-            completed_count=completed_count,
-            total_count=10,
-        )
-    except Exception as e:
-        print(f"Email send error: {e}")
+        try:
+            await send_completion_notification(
+                new_member_name=new_member.user.name,
+                new_member_email=new_member.user.email,
+                program_number=booking.program.number,
+                program_title=booking.program.title,
+                mentor_name=booking.mentor.user.name,
+                completed_count=completed_count,
+                total_count=10,
+            )
+        except Exception as e:
+            print(f"Email send error: {e}")
 
-    return {"message": "完了しました", "completed_at": booking.completed_at}
+    return {
+        "message": "完了しました" if will_complete else "完了を取り消しました",
+        "is_completed": booking.is_completed,
+        "completed_at": booking.completed_at,
+    }
 
 
 @router.delete("/{booking_id}")

@@ -171,13 +171,27 @@ export default function Dashboard({ currentUser }: Props) {
                     }
 
                     if (booking.is_completed) {
+                      const checkIcon = (
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      );
                       return (
                         <td key={p.id} className="px-3 py-3 text-center">
-                          <div className="w-7 h-7 bg-emerald-500 rounded-full mx-auto flex items-center justify-center">
-                            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          </div>
+                          {isMyProgram ? (
+                            <button
+                              onClick={() => handleComplete(booking.booking_id)}
+                              disabled={completing === booking.booking_id}
+                              title="クリックで完了を取り消す"
+                              className="w-7 h-7 bg-emerald-500 hover:bg-amber-500 rounded-full mx-auto flex items-center justify-center transition disabled:opacity-50"
+                            >
+                              {checkIcon}
+                            </button>
+                          ) : (
+                            <div className="w-7 h-7 bg-emerald-500 rounded-full mx-auto flex items-center justify-center">
+                              {checkIcon}
+                            </div>
+                          )}
                         </td>
                       );
                     }
