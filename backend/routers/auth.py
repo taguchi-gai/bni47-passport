@@ -44,22 +44,27 @@ class LoginResponse(BaseModel):
 @router.post("/register")
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
     existing = db.query(models.User).filter(models.User.email == req.email).first()
-    if existing and existing.is_active:
+    # パスワード未設定の既存ユーザー（シード投入のみ）は初回パスワード設定として扱う
+    needs_password_setup = existing and existing.is_active and not existing.password_hash
+    if existing and existing.is_active and existing.password_hash:
         raise HTTPException(status_code=400, detail="このメールアドレスは既に登録されています")
 
-    if existing and not existing.is_active:
-        # 過去に削除（無効化）されたアカウントを再有効化する
-        existing.name = req.name
+    if existing and (not existing.is_active or needs_password_setup):
+        # 過去に削除（無効化）された / シード投入されただけのアカウントを有効化する
         existing.password_hash = auth_utils.get_password_hash(req.password)
-        existing.role = models.RoleEnum.new_member
         existing.is_active = True
-        if not existing.new_member:
+        # 名前は本人入力を尊重（管理者が事前に設定した名前を保持したい場合もあるが、
+        # 本人による初回ログイン時の入力を優先する）
+        existing.name = req.name
+        # 既にメンター/管理者として登録されているならロールは維持、未割当なら new_member
+        if not existing.mentor and not existing.new_member:
+            existing.role = models.RoleEnum.new_member
             db.add(models.NewMember(
                 user_id=existing.id,
                 facebook_url=req.facebook_url,
                 program_term=12,
             ))
-        else:
+        elif existing.new_member:
             existing.new_member.facebook_url = req.facebook_url
         db.commit()
         db.refresh(existing)
