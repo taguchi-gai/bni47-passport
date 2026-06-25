@@ -3,6 +3,8 @@ interface Props {
   onNavigate: (page: string) => void;
   user: { name: string; email: string; role: string };
   onLogout: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 const navItems = [
@@ -30,13 +32,29 @@ const ROLE_COLORS: Record<string, string> = {
   new_member: "bg-green-100 text-green-700",
 };
 
-export default function Sidebar({ currentPage, onNavigate, user, onLogout }: Props) {
+export default function Sidebar({ currentPage, onNavigate, user, onLogout, mobileOpen = false, onMobileClose }: Props) {
   const showAdmin = user.role === "admin";
   const showMentor = user.role === "mentor" || user.role === "admin";
   const showSchedule = user.role !== "new_member" || true;
 
+  const handleNav = (key: string) => {
+    onNavigate(key);
+    onMobileClose?.();
+  };
+
   return (
-    <div className="w-56 bg-white border-r border-gray-200 flex flex-col h-screen fixed left-0 top-0">
+    <>
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 bg-black/40 z-30"
+          onClick={onMobileClose}
+        />
+      )}
+      <div
+        className={`w-56 bg-white border-r border-gray-200 flex flex-col h-screen fixed left-0 top-0 z-40 transition-transform md:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
       <div className="px-4 py-5 border-b border-gray-100">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
@@ -76,7 +94,7 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }: Pro
             {mentorItems.map((item) => (
               <button
                 key={item.key}
-                onClick={() => onNavigate(item.key)}
+                onClick={() => handleNav(item.key)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                   currentPage === item.key
                     ? "bg-indigo-600 text-white"
@@ -98,7 +116,7 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }: Pro
             {adminItems.map((item) => (
               <button
                 key={item.key}
-                onClick={() => onNavigate(item.key)}
+                onClick={() => handleNav(item.key)}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
                   currentPage === item.key
                     ? "bg-indigo-600 text-white"
@@ -135,6 +153,7 @@ export default function Sidebar({ currentPage, onNavigate, user, onLogout }: Pro
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

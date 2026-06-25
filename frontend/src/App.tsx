@@ -22,6 +22,7 @@ export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [authView, setAuthView] = useState<"login" | "register" | "mentor_setup">("login");
   const [loading, setLoading] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // URL params でメンター設定ページへのリダイレクト対応
   useEffect(() => {
@@ -107,8 +108,26 @@ export default function App() {
         onNavigate={(p) => setPage(p as Page)}
         user={user}
         onLogout={handleLogout}
+        mobileOpen={sidebarOpen}
+        onMobileClose={() => setSidebarOpen(false)}
       />
-      <main className="ml-56 flex-1 min-h-screen overflow-auto">
+      {/* モバイル用 上部バー */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-12 bg-white border-b border-gray-200 z-20 flex items-center px-3 gap-3">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="w-9 h-9 flex items-center justify-center rounded-lg hover:bg-gray-100"
+          aria-label="メニューを開く"
+        >
+          <svg className="w-5 h-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-indigo-600 rounded-md flex items-center justify-center text-white font-bold text-xs">47</div>
+          <span className="text-sm font-bold text-gray-900">47∞チャプター</span>
+        </div>
+      </div>
+      <main className="md:ml-56 pt-12 md:pt-0 flex-1 min-h-screen overflow-auto">
         {page === "dashboard" && <Dashboard currentUser={user} />}
         {page === "schedule" && <Schedule currentUser={user} />}
         {page === "admin" && user.role === "admin" && <Admin />}

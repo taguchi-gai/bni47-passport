@@ -6,7 +6,8 @@ name: Keep Render service warm
 
 on:
   schedule:
-    - cron: '*/10 * * * *'   # 10分ごと
+    # GitHub Actions の cron は遅延が大きいので短めに設定（5分ごと指定でも実際は数十分間隔になることが多い）
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:

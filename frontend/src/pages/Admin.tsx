@@ -93,6 +93,18 @@ export default function Admin() {
     }
   }
 
+  async function handleUpdateMemberField(userId: number, field: "name" | "email", value: string) {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    try {
+      await api.put(`/api/admin/members/${userId}`, { [field]: trimmed });
+      await fetchAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "更新に失敗しました");
+      await fetchAll();
+    }
+  }
+
   async function handleResetPassword(userId: number, name: string) {
     const newPassword = prompt(
       `「${name}」さんの新しいパスワードを入力してください（6文字以上）。\nこのパスワードをご本人にお伝えください。`,
@@ -194,8 +206,31 @@ export default function Admin() {
               <tbody className="divide-y divide-gray-100">
                 {members.map((m) => (
                   <tr key={m.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900 text-sm">{m.name}</td>
-                    <td className="px-4 py-3 text-sm text-gray-500">{m.email}</td>
+                    <td className="px-4 py-3">
+                      <input
+                        defaultValue={m.name}
+                        key={`name-${m.id}-${m.name}`}
+                        onBlur={(e) => {
+                          if (e.target.value !== m.name) handleUpdateMemberField(m.id, "name", e.target.value);
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                        className="border border-transparent hover:border-gray-200 focus:border-indigo-400 rounded px-2 py-1 text-sm font-medium text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-40"
+                        title="クリックで編集"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="email"
+                        defaultValue={m.email}
+                        key={`email-${m.id}-${m.email}`}
+                        onBlur={(e) => {
+                          if (e.target.value !== m.email) handleUpdateMemberField(m.id, "email", e.target.value);
+                        }}
+                        onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                        className="border border-transparent hover:border-gray-200 focus:border-indigo-400 rounded px-2 py-1 text-sm text-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-56"
+                        title="クリックで編集"
+                      />
+                    </td>
                     <td className="px-4 py-3 text-sm">
                       {m.facebook_url ? (
                         <a href={m.facebook_url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline text-xs">
