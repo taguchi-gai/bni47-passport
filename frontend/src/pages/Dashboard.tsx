@@ -54,6 +54,19 @@ export default function Dashboard({ currentUser }: Props) {
 
   useEffect(() => { fetchData(); }, []);
 
+  async function handleManualComplete(memberId: number, programNumber: number) {
+    if (!confirm(`プログラム#${programNumber}を「過去に完了済み」として記録しますか？\n（実施日時の記録なしで完了扱いになります）`)) return;
+    try {
+      await api.post("/api/admin/manual-complete", {
+        new_member_id: memberId,
+        program_number: programNumber,
+      });
+      await fetchData();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "記録に失敗しました");
+    }
+  }
+
   async function handleComplete(bookingId: number) {
     setCompleting(bookingId);
     // 楽観的更新: サーバー応答前にローカル state を即座に反転
@@ -191,7 +204,17 @@ export default function Dashboard({ currentUser }: Props) {
                     if (!booking) {
                       return (
                         <td key={p.id} className="px-3 py-3 text-center">
-                          <span className="text-gray-200 text-lg">—</span>
+                          {isAdmin ? (
+                            <button
+                              onClick={() => handleManualComplete(member.id, p.number)}
+                              title="過去に完了したものとして記録"
+                              className="text-gray-300 hover:text-emerald-500 hover:bg-emerald-50 rounded w-7 h-7 mx-auto flex items-center justify-center text-xs transition"
+                            >
+                              ＋
+                            </button>
+                          ) : (
+                            <span className="text-gray-200 text-lg">—</span>
+                          )}
                         </td>
                       );
                     }

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, EmailStr
 from typing import Optional, List
+from datetime import datetime, timedelta
 from database import get_db
 import models
 import auth as auth_utils
@@ -26,6 +27,11 @@ class MemberUpdate(BaseModel):
 
 class PasswordReset(BaseModel):
     new_password: str
+
+
+class ManualComplete(BaseModel):
+    new_member_id: int
+    program_number: int
 
 
 class ProgramUpdate(BaseModel):
@@ -103,6 +109,73 @@ async def get_dashboard(
         })
 
     return {"members": members_data, "programs": programs_data}
+
+
+@router.post("/manual-complete")
+async def manual_complete(
+    req: ManualComplete,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_admin),
+):
+    """システム外で実施済みのプログラムを管理者が完了として記録する"""
+    program = (
+        db.query(models.Program)
+        .filter(models.Program.number == req.program_number)
+        .first()
+    )
+    if not program:
+        raise HTTPException(status_code=404, detail="プログラムが見つかりません")
+
+    new_member = db.query(models.NewMember).filter(models.NewMember.id == req.new_member_id).first()
+    if not new_member:
+        raise HTTPException(status_code=404, detail="新メンバーが見つかりません")
+
+    # 既存の同プログラム予約があれば、それを完了状態に更新
+    existing = (
+        db.query(models.Booking)
+        .filter(
+            models.Booking.new_member_id == req.new_member_id,
+            models.Booking.program_id == program.id,
+        )
+        .first()
+    )
+    if existing:
+        existing.is_completed = True
+        existing.completed_at = datetime.utcnow()
+        db.commit()
+        return {"message": "既存の予約を完了にしました", "booking_id": existing.id}
+
+    # 担当メンターは program.mentor_id を優先、なければ管理者自身
+    mentor_id = program.mentor_id
+    if not mentor_id and current_user.mentor:
+        mentor_id = current_user.mentor.id
+    if not mentor_id:
+        raise HTTPException(status_code=400, detail="担当メンターが未設定です。先にプログラム担当を割り当ててください")
+
+    # ダミースロット作成（過去日時、予約済み扱い）
+    past_dt = datetime.utcnow() - timedelta(days=1)
+    slot = models.AvailabilitySlot(
+        new_member_id=req.new_member_id,
+        start_datetime=past_dt,
+        is_booked=True,
+    )
+    db.add(slot)
+    db.flush()
+
+    booking = models.Booking(
+        slot_id=slot.id,
+        mentor_id=mentor_id,
+        new_member_id=req.new_member_id,
+        program_id=program.id,
+        meeting_url="",
+        meeting_type=models.MeetingTypeEnum.google_meet,
+        is_completed=True,
+        completed_at=datetime.utcnow(),
+    )
+    db.add(booking)
+    db.commit()
+    db.refresh(booking)
+    return {"message": "完了として記録しました", "booking_id": booking.id}
 
 
 @router.get("/members")
