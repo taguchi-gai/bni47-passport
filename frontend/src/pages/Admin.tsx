@@ -132,6 +132,18 @@ export default function Admin() {
     }
   }
 
+  async function handleUpdateProgramTitle(programId: number, title: string) {
+    const trimmed = title.trim();
+    if (!trimmed) return;
+    try {
+      await api.put(`/api/admin/programs/${programId}`, { title: trimmed });
+      await fetchAll();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "タイトル更新に失敗しました");
+      await fetchAll();
+    }
+  }
+
   async function handleProgramMentorByName(programId: number, name: string) {
     const trimmed = name.trim();
     if (!trimmed) {
@@ -340,9 +352,18 @@ export default function Admin() {
             <tbody className="divide-y divide-gray-100">
               {programs.map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 w-1/2">
                     <span className="text-xs text-indigo-600 font-semibold">プログラム第{p.number}号</span>
-                    <p className="text-sm text-gray-700 mt-0.5 line-clamp-1">{p.title}</p>
+                    <textarea
+                      defaultValue={p.title}
+                      key={`title-${p.id}-${p.title}`}
+                      onBlur={(e) => {
+                        if (e.target.value !== p.title) handleUpdateProgramTitle(p.id, e.target.value);
+                      }}
+                      rows={2}
+                      className="mt-1 w-full border border-transparent hover:border-gray-200 focus:border-indigo-400 rounded px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+                      title="クリックして編集（フォーカスを外すと保存）"
+                    />
                   </td>
                   <td className="px-4 py-3">
                     <input
