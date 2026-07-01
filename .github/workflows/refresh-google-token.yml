@@ -19,9 +19,10 @@ jobs:
           body=$(cat /tmp/resp.json 2>/dev/null || echo "no body")
           echo "HTTP $code"
           echo "Body: $body"
-          # google 側でエラーが起きても workflow は成功扱い（監視目的でログだけ残す）
           if echo "$body" | grep -q '"google":"refresh_token active"'; then
             echo "OK: refresh_token is still active"
           else
-            echo "WARN: refresh_token may have expired. Check bookings."
+            echo "::error::Google refresh_token may have expired or Calendar API is failing. Bookings will not work until re-authenticated."
+            echo "::error::Body: $body"
+            exit 1
           fi
