@@ -53,3 +53,22 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/health/google")
+async def health_google():
+    """
+    Google refresh_token を定期的に「使用」して失効を防ぐためのヘルスチェック。
+    Calendar API を軽い読み取り操作で呼び出すことで、トークンをアクティブに保つ。
+    GitHub Actions cron から週1回程度呼び出す想定。
+    """
+    try:
+        from services.google_calendar import _get_credentials
+        from googleapiclient.discovery import build
+        creds = _get_credentials()
+        service = build("calendar", "v3", credentials=creds)
+        # 最軽量の Calendar API 呼び出し（自分の Calendar 一覧を1件だけ取得）
+        service.calendarList().list(maxResults=1).execute()
+        return {"status": "ok", "google": "refresh_token active"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}

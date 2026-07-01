@@ -1,0 +1,27 @@
+name: Refresh Google token
+
+# Google Calendar/Gmail の refresh_token は「機密スコープ + アプリ未検証」の場合、
+# 7日間使われないと Google 側で自動失効する。
+# 週2回 Calendar API を軽く叩くことで、refresh_token をアクティブに保つ。
+
+on:
+  schedule:
+    - cron: '0 3 * * 1,4'  # 週2回（月・木の 03:00 UTC = JST 12:00）
+  workflow_dispatch:
+
+jobs:
+  ping-google:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Google refresh endpoint
+        run: |
+          code=$(curl -s -o /tmp/resp.json -w "%{http_code}" --max-time 90 https://bni47-passport.onrender.com/health/google || echo "000")
+          body=$(cat /tmp/resp.json 2>/dev/null || echo "no body")
+          echo "HTTP $code"
+          echo "Body: $body"
+          # google 側でエラーが起きても workflow は成功扱い（監視目的でログだけ残す）
+          if echo "$body" | grep -q '"google":"refresh_token active"'; then
+            echo "OK: refresh_token is still active"
+          else
+            echo "WARN: refresh_token may have expired. Check bookings."
+          fi
