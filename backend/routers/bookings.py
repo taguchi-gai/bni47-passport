@@ -181,10 +181,21 @@ async def complete_booking(
             )
         booking.is_completed = True
         booking.completed_at = datetime.utcnow()
+        db.commit()
     else:
-        booking.is_completed = False
-        booking.completed_at = None
-    db.commit()
+        # 完了を外す = 予約を削除
+        if booking.google_event_id and booking.google_event_id != "dummy":
+            try:
+                delete_event(booking.google_event_id)
+            except Exception as e:
+                print(f"Calendar delete error: {e}")
+
+        # スロットを未予約に戻す
+        if booking.slot:
+            booking.slot.is_booked = False
+
+        db.delete(booking)
+        db.commit()
 
     if will_complete:
         new_member = booking.new_member
