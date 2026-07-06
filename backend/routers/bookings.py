@@ -90,29 +90,24 @@ async def create_booking(
     mentor_user = mentor.user
     new_member_user = new_member.user
 
-    meeting_url = ""
-    meeting_type = mentor.preferred_meeting
-    google_event_id = None
+    use_zoom = mentor.preferred_meeting == models.MeetingTypeEnum.zoom and mentor.zoom_url
+    meeting_type = models.MeetingTypeEnum.zoom if use_zoom else models.MeetingTypeEnum.google_meet
 
-    if mentor.preferred_meeting == models.MeetingTypeEnum.zoom and mentor.zoom_url:
-        meeting_url = mentor.zoom_url
-        meeting_type = models.MeetingTypeEnum.zoom
-    else:
-        try:
-            result = create_meet_event(
-                summary=f"BNI パスポート #{program.number}",
-                start_datetime=slot.start_datetime,
-                mentor_name=mentor_user.name,
-                mentor_email=mentor_user.email,
-                new_member_name=new_member_user.name,
-                new_member_email=new_member_user.email,
-                program_number=program.number,
-            )
-            meeting_url = result["meet_url"]
-            google_event_id = result["event_id"]
-            meeting_type = models.MeetingTypeEnum.google_meet
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Google Meet作成失敗: {str(e)}")
+    try:
+        result = create_meet_event(
+            summary=f"BNI パスポート #{program.number}",
+            start_datetime=slot.start_datetime,
+            mentor_name=mentor_user.name,
+            mentor_email=mentor_user.email,
+            new_member_name=new_member_user.name,
+            new_member_email=new_member_user.email,
+            program_number=program.number,
+            zoom_url=mentor.zoom_url if use_zoom else None,
+        )
+        meeting_url = result["meet_url"]
+        google_event_id = result["event_id"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"カレンダーイベント作成失敗: {str(e)}")
 
     slot.is_booked = True
 
