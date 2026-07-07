@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from database import get_db
 import models
 import auth as auth_utils
@@ -18,9 +18,28 @@ class SlotResponse(BaseModel):
     id: int
     start_datetime: datetime
     is_booked: bool
+    booked_mentor_name: Optional[str] = None
+    booked_program_number: Optional[int] = None
 
     class Config:
         from_attributes = True
+
+
+def _to_slot_response(slot: models.AvailabilitySlot, booking: Optional[models.Booking]) -> dict:
+    booked_mentor_name = None
+    booked_program_number = None
+    if booking:
+        if booking.mentor and booking.mentor.user:
+            booked_mentor_name = booking.mentor.user.name
+        if booking.program:
+            booked_program_number = booking.program.number
+    return {
+        "id": slot.id,
+        "start_datetime": slot.start_datetime,
+        "is_booked": slot.is_booked,
+        "booked_mentor_name": booked_mentor_name,
+        "booked_program_number": booked_program_number,
+    }
 
 
 @router.get("/member/{new_member_id}", response_model=List[SlotResponse])
@@ -56,7 +75,19 @@ async def get_my_availability(
         .order_by(models.AvailabilitySlot.start_datetime)
         .all()
     )
-    return slots
+
+    bookings = (
+        db.query(models.Booking)
+        .options(
+            joinedload(models.Booking.mentor).joinedload(models.Mentor.user),
+            joinedload(models.Booking.program),
+        )
+        .filter(models.Booking.new_member_id == current_user.new_member.id)
+        .all()
+    )
+    bookings_by_slot = {b.slot_id: b for b in bookings}
+
+    return [_to_slot_response(s, bookings_by_slot.get(s.id)) for s in slots]
 
 
 @router.post("/", response_model=SlotResponse)

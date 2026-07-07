@@ -283,14 +283,27 @@ export default function Schedule({ currentUser }: Props) {
                       if (isNewMember) {
                         const selected = !!slot;
                         const booked = slot?.is_booked;
+                        if (booked) {
+                          const label = slot?.booked_mentor_name
+                            ? `${slot.booked_mentor_name}${slot.booked_program_number ? ` #${slot.booked_program_number}` : ""}`
+                            : "予約済み";
+                          return (
+                            <td key={day.toISOString()} className="border-r h-10 p-0.5">
+                              <div
+                                title={label}
+                                className="w-full h-full bg-green-400 text-white text-[10px] leading-tight rounded flex items-center justify-center px-1 text-center truncate"
+                              >
+                                {label}
+                              </div>
+                            </td>
+                          );
+                        }
                         return (
                           <td
                             key={day.toISOString()}
-                            onClick={() => !isPast && !booked && toggleSlot(day, hour)}
+                            onClick={() => !isPast && toggleSlot(day, hour)}
                             className={`border-r h-10 cursor-pointer transition ${
-                              booked
-                                ? "bg-green-400"
-                                : selected
+                              selected
                                 ? "bg-indigo-500"
                                 : isPast
                                 ? "bg-gray-50 cursor-default"
