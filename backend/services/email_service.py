@@ -1,37 +1,39 @@
-import aiosmtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import os
+import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
 
-SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
-SMTP_APP_PASSWORD = os.getenv("SMTP_APP_PASSWORD", "")
+
+BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 async def send_email(to: str, subject: str, body_html: str):
-    if not SMTP_EMAIL or not SMTP_APP_PASSWORD:
+    if not BREVO_API_KEY or not SMTP_EMAIL:
         print(f"[Email Skip] To: {to}, Subject: {subject}")
         return
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = subject
-    msg["From"] = f"BNI 47∞チャプター パスポート <{SMTP_EMAIL}>"
-    msg["To"] = to
+    payload = {
+        "sender": {"name": "BNI 47∞チャプター パスポート", "email": SMTP_EMAIL},
+        "to": [{"email": to}],
+        "subject": subject,
+        "htmlContent": body_html,
+    }
 
-    msg.attach(MIMEText(body_html, "html", "utf-8"))
-
-    await aiosmtplib.send(
-        msg,
-        hostname=SMTP_HOST,
-        port=SMTP_PORT,
-        username=SMTP_EMAIL,
-        password=SMTP_APP_PASSWORD,
-        start_tls=True,
-    )
+    async with httpx.AsyncClient(timeout=15) as client:
+        res = await client.post(
+            BREVO_API_URL,
+            json=payload,
+            headers={
+                "api-key": BREVO_API_KEY,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+        )
+        if res.status_code >= 300:
+            raise RuntimeError(f"Brevo API error: {res.status_code} {res.text}")
 
 
 async def send_booking_notification(
