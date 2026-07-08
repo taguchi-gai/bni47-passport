@@ -55,26 +55,6 @@ async def health():
     return {"status": "ok"}
 
 
-@app.get("/health/email")
-async def health_email():
-    """Brevo経由のメール送信疎通確認用の一時的な診断エンドポイント"""
-    from services.email_service import send_email, SMTP_EMAIL, BREVO_API_KEY
-    try:
-        await send_email(SMTP_EMAIL, "BNIパスポート メール疎通テスト", "<p>テストメールです。届いていれば設定は正常です。</p>")
-        return {
-            "status": "ok",
-            "smtp_email_set": bool(SMTP_EMAIL),
-            "brevo_api_key_set": bool(BREVO_API_KEY),
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "detail": str(e),
-            "smtp_email_set": bool(SMTP_EMAIL),
-            "brevo_api_key_set": bool(BREVO_API_KEY),
-        }
-
-
 @app.get("/health/google")
 async def health_google():
     """
