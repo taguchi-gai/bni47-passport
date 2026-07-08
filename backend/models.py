@@ -25,6 +25,8 @@ class User(Base):
     password_hash = Column(String(255), nullable=True)
     role = Column(Enum(RoleEnum), nullable=False, default=RoleEnum.new_member)
     is_active = Column(Boolean, default=True)
+    reset_token = Column(String(255), nullable=True)
+    reset_token_expires = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     mentor = relationship("Mentor", back_populates="user", uselist=False)

@@ -4,9 +4,10 @@ import { loginRequest } from "../api/client";
 interface Props {
   onLogin: (token: string, role: string, name: string, userId: number) => void;
   onShowRegister?: () => void;
+  onShowForgotPassword?: () => void;
 }
 
-export default function Login({ onLogin, onShowRegister }: Props) {
+export default function Login({ onLogin, onShowRegister, onShowForgotPassword }: Props) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -79,6 +80,19 @@ export default function Login({ onLogin, onShowRegister }: Props) {
             {loading ? "ログイン中..." : "ログイン"}
           </button>
         </form>
+        <p className="mt-3 text-center text-sm">
+          {onShowForgotPassword ? (
+            <button
+              type="button"
+              onClick={onShowForgotPassword}
+              className="text-indigo-600 hover:underline"
+            >
+              パスワードをお忘れですか？
+            </button>
+          ) : (
+            <span className="text-gray-400">パスワードをお忘れですか？</span>
+          )}
+        </p>
         <p className="mt-4 text-center text-sm text-gray-500">
           アカウントをお持ちでない方は{" "}
           {onShowRegister ? (

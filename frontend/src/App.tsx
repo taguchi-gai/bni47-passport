@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import MentorSetup from "./pages/MentorSetup";
 import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
@@ -20,7 +22,10 @@ type Page = "dashboard" | "schedule" | "admin" | "mentor_setup";
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [page, setPage] = useState<Page>("dashboard");
-  const [authView, setAuthView] = useState<"login" | "register" | "mentor_setup">("login");
+  const [authView, setAuthView] = useState<"login" | "register" | "mentor_setup" | "forgot_password" | "reset_password">(
+    window.location.pathname === "/reset-password" ? "reset_password" : "login"
+  );
+  const [resetToken] = useState<string>(() => new URLSearchParams(window.location.search).get("token") || "");
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -75,6 +80,18 @@ export default function App() {
     );
   }
 
+  if (authView === "reset_password") {
+    return (
+      <ResetPassword
+        token={resetToken}
+        onDone={() => {
+          window.history.replaceState({}, "", "/");
+          setAuthView("login");
+        }}
+      />
+    );
+  }
+
   if (!user) {
     // URL ハッシュで登録画面を出せるようにする（招待リンクとして配布できる）
     const hash = window.location.hash;
@@ -89,10 +106,14 @@ export default function App() {
         />
       );
     }
+    if (authView === "forgot_password") {
+      return <ForgotPassword onBack={() => setAuthView("login")} />;
+    }
     return (
       <Login
         onLogin={handleLogin}
         onShowRegister={() => setAuthView("register")}
+        onShowForgotPassword={() => setAuthView("forgot_password")}
       />
     );
   }

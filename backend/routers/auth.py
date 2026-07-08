@@ -3,6 +3,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 import os
+import secrets
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
@@ -12,6 +14,7 @@ from googleapiclient.discovery import build
 from database import get_db
 import models
 import auth as auth_utils
+from services.email_service import send_email
 
 load_dotenv()
 
@@ -30,6 +33,15 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     facebook_url: str = ""
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 
 class LoginResponse(BaseModel):
@@ -116,6 +128,53 @@ async def login(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depen
         email=user.email,
         role=user.role.value,
     )
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """パスワードリセット用のメールを送信する。
+    アカウントの有無に関わらず同じレスポンスを返す（メールアドレス列挙対策）。
+    """
+    user = db.query(models.User).filter(models.User.email == req.email).first()
+    if user and user.is_active and user.password_hash:
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        db.commit()
+
+        reset_url = f"{FRONTEND_URL}/reset-password?token={token}"
+        html = f"""
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #4f46e5;">BNI 47∞ パスポートプログラム - パスワード再設定</h2>
+          <hr/>
+          <p>{user.name} 様</p>
+          <p>パスワード再設定のご依頼を受け付けました。以下のリンクから新しいパスワードを設定してください（有効期限：1時間）。</p>
+          <p><a href="{reset_url}" style="display:inline-block;padding:10px 20px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;">パスワードを再設定する</a></p>
+          <p style="color:#666;font-size:12px;">このリンクは1時間で無効になります。心当たりがない場合はこのメールを無視してください。</p>
+        </div>
+        """
+        try:
+            await send_email(user.email, "【BNIパスポート】パスワード再設定のご案内", html)
+        except Exception as e:
+            print(f"Password reset email error: {e}")
+
+    return {"message": "登録されているメールアドレスであれば、再設定用のメールを送信しました"}
+
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest, db: Session = Depends(get_db)):
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="パスワードは6文字以上にしてください")
+
+    user = db.query(models.User).filter(models.User.reset_token == req.token).first()
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=400, detail="リンクが無効か期限切れです。もう一度パスワード再設定をお試しください")
+
+    user.password_hash = auth_utils.get_password_hash(req.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    return {"message": "パスワードを再設定しました"}
 
 
 def _build_flow():
