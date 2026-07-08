@@ -237,9 +237,9 @@ async def complete_booking(
             print(f"Email send error: {e}")
 
     return {
-        "message": "完了しました" if will_complete else "完了を取り消しました",
-        "is_completed": booking.is_completed,
-        "completed_at": booking.completed_at,
+        "message": "完了しました" if will_complete else "完了を取り消し、予約を削除しました",
+        "is_completed": will_complete,
+        "completed_at": booking.completed_at if will_complete else None,
     }
 
 
