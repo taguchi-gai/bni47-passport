@@ -61,10 +61,16 @@ async def create_booking(
     if not program:
         raise HTTPException(status_code=404, detail="プログラムが見つかりません")
 
-    mentor = current_user.mentor
-    if not mentor and current_user.role == models.RoleEnum.admin:
-        if program.mentor_id:
-            mentor = db.query(models.Mentor).filter(models.Mentor.id == program.mentor_id).first()
+    if current_user.role == models.RoleEnum.admin:
+        # 管理者はこのプログラムの本来の担当メンター名義で予約を代理作成する
+        mentor = (
+            db.query(models.Mentor).filter(models.Mentor.id == program.mentor_id).first()
+            if program.mentor_id else None
+        )
+    else:
+        mentor = current_user.mentor
+        if not mentor or mentor.id != program.mentor_id:
+            raise HTTPException(status_code=403, detail="このプログラムの担当メンターではありません")
 
     if not mentor:
         raise HTTPException(status_code=400, detail="メンター情報が見つかりません")
