@@ -55,6 +55,31 @@ async def health():
     return {"status": "ok"}
 
 
+@app.get("/health/email")
+async def health_email():
+    """SMTP送信の疎通確認用の一時的な診断エンドポイント"""
+    import os
+    from services.email_service import send_email, SMTP_EMAIL, SMTP_APP_PASSWORD, SMTP_HOST, SMTP_PORT
+    try:
+        await send_email(SMTP_EMAIL, "BNIパスポート SMTP疎通テスト", "<p>テストメールです。届いていれば設定は正常です。</p>")
+        return {
+            "status": "ok",
+            "smtp_email_set": bool(SMTP_EMAIL),
+            "smtp_password_set": bool(SMTP_APP_PASSWORD),
+            "smtp_host": SMTP_HOST,
+            "smtp_port": SMTP_PORT,
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "detail": str(e),
+            "smtp_email_set": bool(SMTP_EMAIL),
+            "smtp_password_set": bool(SMTP_APP_PASSWORD),
+            "smtp_host": SMTP_HOST,
+            "smtp_port": SMTP_PORT,
+        }
+
+
 @app.get("/health/google")
 async def health_google():
     """
