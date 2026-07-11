@@ -252,7 +252,7 @@ export default function Dashboard({ currentUser }: Props) {
                             : booking.start_datetime + "Z"
                         )
                       : null;
-                    const isFuture = startDate ? startDate > new Date() : false;
+                    const isFuture = !isAdmin && startDate ? startDate > new Date() : false;
                     return (
                       <td key={p.id} className="px-3 py-3 text-center relative">
                         {isMyProgram && (

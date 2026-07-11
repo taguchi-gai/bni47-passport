@@ -189,7 +189,8 @@ async def complete_booking(
     will_complete = not booking.is_completed
 
     if will_complete:
-        if booking.slot and booking.slot.start_datetime > datetime.utcnow():
+        is_admin = current_user.role == models.RoleEnum.admin
+        if not is_admin and booking.slot and booking.slot.start_datetime > datetime.utcnow():
             raise HTTPException(
                 status_code=400,
                 detail="予約日時が経過してから完了マークできます",
