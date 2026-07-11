@@ -40,6 +40,7 @@ export default function Dashboard({ currentUser }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [completing, setCompleting] = useState<number | null>(null);
+  const [currentTerm, setCurrentTerm] = useState<number | null>(null);
 
   const fetchData = async () => {
     try {
@@ -52,7 +53,12 @@ export default function Dashboard({ currentUser }: Props) {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    api.get<{ current_term: number }>("/api/admin/settings")
+      .then((s) => setCurrentTerm(s.current_term))
+      .catch(() => {});
+  }, []);
 
   async function handleManualComplete(memberId: number, programNumber: number) {
     if (!confirm(`プログラム#${programNumber}を「過去に完了済み」として記録しますか？\n（実施日時の記録なしで完了扱いになります）`)) return;
@@ -147,7 +153,7 @@ export default function Dashboard({ currentUser }: Props) {
               : "プログラム進捗と予定されているメンター面談の日程を確認できます"}
           </p>
         </div>
-        <div className="text-sm text-gray-500">第12期</div>
+        <div className="text-sm text-gray-500">{currentTerm ? `第${currentTerm}期` : ""}</div>
       </div>
 
       {isNewMember && me && (

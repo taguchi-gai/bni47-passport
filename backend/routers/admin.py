@@ -45,6 +45,43 @@ class MentorUpdate(BaseModel):
     preferred_meeting: Optional[str] = None
 
 
+class SettingsUpdate(BaseModel):
+    current_term: int
+
+
+def _get_or_create_settings(db: Session) -> models.SystemSetting:
+    settings = db.query(models.SystemSetting).first()
+    if not settings:
+        settings = models.SystemSetting(current_term=12)
+        db.add(settings)
+        db.commit()
+        db.refresh(settings)
+    return settings
+
+
+@router.get("/settings")
+async def get_settings(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.get_current_user),
+):
+    settings = _get_or_create_settings(db)
+    return {"current_term": settings.current_term}
+
+
+@router.put("/settings")
+async def update_settings(
+    req: SettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_admin),
+):
+    if req.current_term < 1:
+        raise HTTPException(status_code=400, detail="期は1以上にしてください")
+    settings = _get_or_create_settings(db)
+    settings.current_term = req.current_term
+    db.commit()
+    return {"current_term": settings.current_term}
+
+
 @router.get("/dashboard")
 async def get_dashboard(
     db: Session = Depends(get_db),

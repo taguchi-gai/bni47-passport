@@ -53,8 +53,14 @@ class LoginResponse(BaseModel):
     role: str
 
 
+def _get_current_term(db: Session) -> int:
+    settings = db.query(models.SystemSetting).first()
+    return settings.current_term if settings else 12
+
+
 @router.post("/register")
 async def register(req: RegisterRequest, db: Session = Depends(get_db)):
+    current_term = _get_current_term(db)
     existing = db.query(models.User).filter(models.User.email == req.email).first()
     # パスワード未設定の既存ユーザー（シード投入のみ）は初回パスワード設定として扱う
     needs_password_setup = existing and existing.is_active and not existing.password_hash
@@ -74,7 +80,7 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
             db.add(models.NewMember(
                 user_id=existing.id,
                 facebook_url=req.facebook_url,
-                program_term=12,
+                program_term=current_term,
             ))
         elif existing.new_member:
             existing.new_member.facebook_url = req.facebook_url
@@ -94,7 +100,7 @@ async def register(req: RegisterRequest, db: Session = Depends(get_db)):
         member = models.NewMember(
             user_id=user.id,
             facebook_url=req.facebook_url,
-            program_term=12,
+            program_term=current_term,
         )
         db.add(member)
         db.commit()

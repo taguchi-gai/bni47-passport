@@ -74,6 +74,13 @@ class AvailabilitySlot(Base):
     booking = relationship("Booking", back_populates="slot", uselist=False)
 
 
+class SystemSetting(Base):
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    current_term = Column(Integer, default=12)
+
+
 class Program(Base):
     __tablename__ = "programs"
 
