@@ -17,6 +17,7 @@ async def send_email(to: str, subject: str, body_html: str):
 
     payload = {
         "sender": {"name": "BNI 47∞チャプター パスポート", "email": SMTP_EMAIL},
+        "replyTo": {"name": "BNI 47∞チャプター パスポート", "email": SMTP_EMAIL},
         "to": [{"email": to}],
         "subject": subject,
         "htmlContent": body_html,
