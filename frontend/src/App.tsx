@@ -6,6 +6,7 @@ import ResetPassword from "./pages/ResetPassword";
 import MentorSetup from "./pages/MentorSetup";
 import Dashboard from "./pages/Dashboard";
 import Schedule from "./pages/Schedule";
+import Training from "./pages/Training";
 import Admin from "./pages/Admin";
 import Sidebar from "./components/Sidebar";
 import { api } from "./api/client";
@@ -17,7 +18,7 @@ interface User {
   role: string;
 }
 
-type Page = "dashboard" | "schedule" | "admin" | "mentor_setup";
+type Page = "dashboard" | "schedule" | "training" | "admin" | "mentor_setup";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -151,6 +152,7 @@ export default function App() {
       <main className="md:ml-56 pt-12 md:pt-0 flex-1 min-h-screen overflow-auto">
         {page === "dashboard" && <Dashboard currentUser={user} />}
         {page === "schedule" && <Schedule currentUser={user} />}
+        {page === "training" && <Training currentUser={user} />}
         {page === "admin" && user.role === "admin" && <Admin />}
         {page === "mentor_setup" && (user.role === "mentor" || user.role === "admin") && (
           <MentorSetup embedded onDone={() => setPage("dashboard")} />

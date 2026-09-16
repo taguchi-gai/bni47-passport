@@ -5,7 +5,7 @@ import os
 
 from database import engine, SessionLocal
 import models
-from routers import auth, availability, bookings, admin, mentors
+from routers import auth, availability, bookings, admin, mentors, trainings
 
 load_dotenv()
 
@@ -15,11 +15,20 @@ models.Base.metadata.create_all(bind=engine)
 def auto_seed():
     db = SessionLocal()
     try:
-        if db.query(models.User).count() == 0:
-            from seed import run as seed_run
-            seed_run(db)
-    except Exception as e:
-        print(f"Auto-seed error: {e}")
+        try:
+            if db.query(models.User).count() == 0:
+                from seed import run as seed_run
+                seed_run(db)
+        except Exception as e:
+            print(f"Auto-seed error: {e}")
+
+        # トレーニングマスターは既存環境にも追加投入する。
+        # 上の初期投入が失敗してもこちらは独立して実行する
+        try:
+            from routers.trainings import seed_trainings
+            seed_trainings(db)
+        except Exception as e:
+            print(f"Training seed error: {e}")
     finally:
         db.close()
 
@@ -43,6 +52,7 @@ app.include_router(availability.router)
 app.include_router(bookings.router)
 app.include_router(admin.router)
 app.include_router(mentors.router)
+app.include_router(trainings.router)
 
 
 @app.get("/")

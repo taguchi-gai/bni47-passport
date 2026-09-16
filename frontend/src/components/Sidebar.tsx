@@ -10,6 +10,7 @@ interface Props {
 const navItems = [
   { key: "dashboard", label: "ダッシュボード", icon: "⊞" },
   { key: "schedule", label: "スケジュール調整", icon: "📅" },
+  { key: "training", label: "トレーニング", icon: "🎓" },
 ];
 
 const mentorItems = [

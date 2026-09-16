@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Enum, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from database import Base
@@ -54,11 +54,14 @@ class NewMember(Base):
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
     facebook_url = Column(String(500), nullable=True)
     program_term = Column(Integer, default=12)  # 期
+    # 入会後に最初に参加した定例会の日付。トレーニング推奨期限の起算日になる
+    first_meeting_date = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="new_member")
     availability_slots = relationship("AvailabilitySlot", back_populates="new_member")
     bookings = relationship("Booking", back_populates="new_member")
+    training_records = relationship("TrainingRecord", back_populates="new_member")
 
 
 class AvailabilitySlot(Base):
@@ -94,6 +97,42 @@ class Program(Base):
 
     mentor = relationship("Mentor")
     bookings = relationship("Booking", back_populates="program")
+
+
+class Training(Base):
+    """BNIトレーニングのマスター"""
+    __tablename__ = "trainings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(200), nullable=False)
+    display_order = Column(Integer, nullable=False, default=0)
+    # 推奨受講期限（初回定例会からの日数）。期限なしのトレーニングは None
+    recommended_days = Column(Integer, nullable=True)
+    is_active = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    records = relationship("TrainingRecord", back_populates="training")
+
+
+class TrainingRecord(Base):
+    """新メンバーごとのトレーニング受講記録"""
+    __tablename__ = "training_records"
+    __table_args__ = (
+        UniqueConstraint("new_member_id", "training_id", name="uq_training_record_member_training"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    new_member_id = Column(Integer, ForeignKey("new_members.id"), nullable=False)
+    training_id = Column(Integer, ForeignKey("trainings.id"), nullable=False)
+    is_completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime, nullable=True)
+    # 誰がチェックしたか（本人 / メンター / 管理者の区別用）
+    completed_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    new_member = relationship("NewMember", back_populates="training_records")
+    training = relationship("Training", back_populates="records")
+    completed_by = relationship("User")
 
 
 class Booking(Base):
