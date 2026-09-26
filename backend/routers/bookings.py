@@ -79,6 +79,12 @@ async def create_booking(
     if not new_member:
         raise HTTPException(status_code=404, detail="新メンバーが見つかりません")
 
+    if new_member.program_term != program.term:
+        raise HTTPException(
+            status_code=400,
+            detail="この新メンバーの所属期と異なる期のプログラムです。担当メンター・期の設定を確認してください。",
+        )
+
     existing_booking = (
         db.query(models.Booking)
         .filter(

@@ -29,6 +29,7 @@ interface Member {
 interface DashboardData {
   members: Member[];
   programs: Program[];
+  term?: number;
 }
 
 interface Props {
@@ -41,11 +42,18 @@ export default function Dashboard({ currentUser }: Props) {
   const [error, setError] = useState("");
   const [completing, setCompleting] = useState<number | null>(null);
   const [currentTerm, setCurrentTerm] = useState<number | null>(null);
+  const [viewTerm, setViewTerm] = useState<number | null>(null);
+  const [availableTerms, setAvailableTerms] = useState<number[]>([]);
 
-  const fetchData = async () => {
+  const isNewMember = currentUser.role === "new_member";
+
+  const fetchData = async (term?: number | null) => {
+    setLoading(true);
     try {
-      const d = await api.get<DashboardData>("/api/admin/dashboard");
+      const query = !isNewMember && term ? `?term=${term}` : "";
+      const d = await api.get<DashboardData>(`/api/admin/dashboard${query}`);
       setData(d);
+      if (d.term) setViewTerm(d.term);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "データの取得に失敗しました");
     } finally {
@@ -58,7 +66,18 @@ export default function Dashboard({ currentUser }: Props) {
     api.get<{ current_term: number }>("/api/admin/settings")
       .then((s) => setCurrentTerm(s.current_term))
       .catch(() => {});
+    if (!isNewMember) {
+      api.get<number[]>("/api/admin/programs/terms")
+        .then(setAvailableTerms)
+        .catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function handleChangeTerm(term: number) {
+    setViewTerm(term);
+    fetchData(term);
+  }
 
   async function handleManualComplete(memberId: number, programNumber: number) {
     if (!confirm(`プログラム#${programNumber}を「過去に完了済み」として記録しますか？\n（実施日時の記録なしで完了扱いになります）`)) return;
@@ -138,7 +157,6 @@ export default function Dashboard({ currentUser }: Props) {
   );
 
   const isAdmin = currentUser.role === "admin";
-  const isNewMember = currentUser.role === "new_member";
   // 新メンバーの場合、バックは自分のデータのみ返すので members[0] が自分
   const me = isNewMember && data.members.length > 0 ? data.members[0] : null;
 
@@ -153,7 +171,23 @@ export default function Dashboard({ currentUser }: Props) {
               : "プログラム進捗と予定されているメンター面談の日程を確認できます"}
           </p>
         </div>
-        <div className="text-sm text-gray-500">{currentTerm ? `第${currentTerm}期` : ""}</div>
+        {isNewMember ? (
+          <div className="text-sm text-gray-500">{currentTerm ? `第${currentTerm}期` : ""}</div>
+        ) : (
+          <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
+            <span className="text-sm text-gray-500">第</span>
+            <select
+              value={viewTerm ?? ""}
+              onChange={(e) => handleChangeTerm(Number(e.target.value))}
+              className="bg-transparent text-sm font-medium text-gray-700 focus:outline-none"
+            >
+              {availableTerms.map((t) => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+            <span className="text-sm text-gray-500">期</span>
+          </div>
+        )}
       </div>
 
       {isNewMember && me && (

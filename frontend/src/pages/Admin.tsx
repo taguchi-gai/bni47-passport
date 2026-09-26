@@ -13,6 +13,7 @@ interface Member {
   zoom_url?: string;
   preferred_meeting?: string;
   is_active: boolean;
+  program_term?: number;
 }
 
 interface Program {
@@ -21,6 +22,7 @@ interface Program {
   title: string;
   mentor_id: number | null;
   mentor_name: string | null;
+  term?: number;
 }
 
 interface Mentor {
@@ -42,21 +44,28 @@ export default function Admin() {
   const [currentTerm, setCurrentTerm] = useState<number | null>(null);
   const [termInput, setTermInput] = useState("");
   const [savingTerm, setSavingTerm] = useState(false);
+  const [availableTerms, setAvailableTerms] = useState<number[]>([]);
+  const [programTerm, setProgramTerm] = useState<number | null>(null);
+  const [advancingTerm, setAdvancingTerm] = useState(false);
 
-  const fetchAll = async () => {
+  const fetchAll = async (term?: number) => {
     setLoading(true);
     try {
-      const [m, p, mt, s] = await Promise.all([
+      const [m, mt, s, terms] = await Promise.all([
         api.get<Member[]>("/api/admin/members"),
-        api.get<Program[]>("/api/admin/programs"),
         api.get<Mentor[]>("/api/admin/mentors"),
         api.get<{ current_term: number }>("/api/admin/settings"),
+        api.get<number[]>("/api/admin/programs/terms"),
       ]);
+      const targetTerm = term ?? programTerm ?? s.current_term;
+      const p = await api.get<Program[]>(`/api/admin/programs?term=${targetTerm}`);
       setMembers(m);
       setPrograms(p);
       setMentors(mt);
       setCurrentTerm(s.current_term);
       setTermInput(String(s.current_term));
+      setAvailableTerms(terms);
+      setProgramTerm(targetTerm);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "データの取得に失敗しました");
     } finally {
@@ -80,6 +89,39 @@ export default function Admin() {
       alert(err instanceof Error ? err.message : "期の更新に失敗しました");
     } finally {
       setSavingTerm(false);
+    }
+  }
+
+  function handleChangeProgramTerm(term: number) {
+    fetchAll(term);
+  }
+
+  async function handleAdvanceTerm() {
+    if (!confirm(
+      `第${(currentTerm ?? 0) + 1}期のプログラム#1〜#10を、メンター未割当の状態で新規作成します。\n` +
+      "現在の期のメンター担当はそのまま残ります（前期の新メンバーはそのまま前期のメンターを見続けます）。\n\n続けますか？"
+    )) return;
+    setAdvancingTerm(true);
+    try {
+      const res = await api.post<{ message: string; term: number }>("/api/admin/programs/advance-term", {});
+      alert(res.message);
+      await fetchAll(res.term);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "期の作成に失敗しました");
+    } finally {
+      setAdvancingTerm(false);
+    }
+  }
+
+  async function handleUpdateMemberTerm(userId: number, value: string) {
+    const term = Number(value);
+    if (!Number.isInteger(term) || term < 1) return;
+    try {
+      await api.put(`/api/admin/members/${userId}`, { program_term: term });
+      await fetchAll(programTerm ?? undefined);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "所属期の更新に失敗しました");
+      await fetchAll(programTerm ?? undefined);
     }
   }
 
@@ -252,7 +294,7 @@ export default function Admin() {
             <table className="min-w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  {["氏名", "通知用GMAIL", "FACEBOOK", "ロール", "完了状況", ""].map((h) => (
+                  {["氏名", "通知用GMAIL", "FACEBOOK", "ロール", "所属期", "完了状況", ""].map((h) => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                   ))}
                 </tr>
@@ -302,6 +344,26 @@ export default function Admin() {
                         <option value="mentor">メンター</option>
                         <option value="admin">管理者</option>
                       </select>
+                    </td>
+                    <td className="px-4 py-3">
+                      {m.role === "new_member" ? (
+                        <input
+                          type="number"
+                          min={1}
+                          defaultValue={m.program_term ?? ""}
+                          key={`term-${m.id}-${m.program_term}`}
+                          onBlur={(e) => {
+                            if (e.target.value && Number(e.target.value) !== m.program_term) {
+                              handleUpdateMemberTerm(m.id, e.target.value);
+                            }
+                          }}
+                          onKeyDown={(e) => { if (e.key === "Enter") (e.currentTarget as HTMLInputElement).blur(); }}
+                          className="border border-transparent hover:border-gray-200 focus:border-indigo-400 rounded px-2 py-1 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-16"
+                          title="所属期（クリックで編集）"
+                        />
+                      ) : (
+                        <span className="text-gray-300">—</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">{m.role === "new_member" ? "—/10" : "—"}</td>
                     <td className="px-4 py-3">
@@ -379,9 +441,33 @@ export default function Admin() {
               <option key={m.id} value={m.name} />
             ))}
           </datalist>
-          <div className="px-6 py-4 border-b">
-            <h2 className="font-semibold text-gray-900">プログラム担当・メンター変更（期の交替）</h2>
-            <p className="text-xs text-gray-500 mt-1">メンター名を入力（候補リストから選択も可能）。先にメンター登録が必要です。</p>
+          <div className="px-6 py-4 border-b flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <h2 className="font-semibold text-gray-900">プログラム担当・メンター変更（期の交替）</h2>
+              <p className="text-xs text-gray-500 mt-1">メンター名を入力（候補リストから選択も可能）。先にメンター登録が必要です。</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1">
+                <span className="text-sm text-gray-500">表示する期：</span>
+                <select
+                  value={programTerm ?? ""}
+                  onChange={(e) => handleChangeProgramTerm(Number(e.target.value))}
+                  className="border border-gray-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  {availableTerms.map((t) => (
+                    <option key={t} value={t}>第{t}期</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleAdvanceTerm}
+                disabled={advancingTerm}
+                className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition"
+                title="現在の期の次の期を、メンター未割当の状態で新規作成します"
+              >
+                {advancingTerm ? "作成中..." : `＋ 第${(currentTerm ?? 0) + 1}期を新規作成`}
+              </button>
+            </div>
           </div>
           <table className="min-w-full">
             <thead className="bg-gray-50">

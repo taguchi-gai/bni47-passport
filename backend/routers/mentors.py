@@ -42,7 +42,13 @@ async def get_my_mentor_info(
     if not mentor:
         raise HTTPException(status_code=400, detail="メンター情報が見つかりません")
 
-    program = db.query(models.Program).filter(models.Program.mentor_id == mentor.id).first()
+    # 同一人物が複数期にまたがってメンターレコードを持つケースに備え、最新の期を優先する
+    program = (
+        db.query(models.Program)
+        .filter(models.Program.mentor_id == mentor.id)
+        .order_by(models.Program.term.desc())
+        .first()
+    )
 
     return {
         "id": mentor.id,
@@ -64,8 +70,19 @@ async def get_assigned_new_members(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_mentor_or_admin),
 ):
-    """メンターが担当する新メンバーの一覧と空き時間を取得"""
-    new_members = (
+    """メンターが担当する新メンバーの一覧と空き時間を取得。
+    メンターの場合は自分が担当する期の新メンバーだけに絞り込む。管理者は全期表示。"""
+    mentor = current_user.mentor
+    program = None
+    if mentor:
+        program = (
+            db.query(models.Program)
+            .filter(models.Program.mentor_id == mentor.id)
+            .order_by(models.Program.term.desc())
+            .first()
+        )
+
+    nm_query = (
         db.query(models.NewMember)
         .options(
             joinedload(models.NewMember.user),
@@ -76,16 +93,18 @@ async def get_assigned_new_members(
         .join(models.User, models.NewMember.user_id == models.User.id)
         .filter(models.User.is_active == True)
         .filter(models.User.role == models.RoleEnum.new_member)
-        .all()
     )
+
+    if current_user.role == models.RoleEnum.mentor:
+        if not program:
+            # プログラム未割当のメンターには誰も表示しない
+            return []
+        nm_query = nm_query.filter(models.NewMember.program_term == program.term)
+
+    new_members = nm_query.all()
 
     result = []
     for nm in new_members:
-        mentor = current_user.mentor
-        program = None
-        if mentor:
-            program = db.query(models.Program).filter(models.Program.mentor_id == mentor.id).first()
-
         already_booked = False
         if program:
             already_booked = any(

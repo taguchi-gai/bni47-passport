@@ -23,6 +23,7 @@ class MemberUpdate(BaseModel):
     facebook_url: Optional[str] = None
     role: Optional[str] = None
     is_active: Optional[bool] = None
+    program_term: Optional[int] = None
 
 
 class PasswordReset(BaseModel):
@@ -84,9 +85,18 @@ async def update_settings(
 
 @router.get("/dashboard")
 async def get_dashboard(
+    term: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.get_current_user),
 ):
+    if current_user.role == models.RoleEnum.new_member:
+        if not current_user.new_member:
+            raise HTTPException(status_code=400, detail="新メンバー情報がありません")
+        # 新メンバー本人は必ず自分の所属期を見る（term指定は無視）
+        target_term = current_user.new_member.program_term
+    else:
+        target_term = term if term is not None else _get_or_create_settings(db).current_term
+
     nm_query = (
         db.query(models.NewMember)
         .join(models.User, models.NewMember.user_id == models.User.id)
@@ -96,16 +106,16 @@ async def get_dashboard(
         )
         .filter(models.User.is_active == True)
         .filter(models.User.role == models.RoleEnum.new_member)
+        .filter(models.NewMember.program_term == target_term)
     )
     if current_user.role == models.RoleEnum.new_member:
-        if not current_user.new_member:
-            raise HTTPException(status_code=400, detail="新メンバー情報がありません")
         nm_query = nm_query.filter(models.NewMember.id == current_user.new_member.id)
     new_members = nm_query.all()
 
     programs = (
         db.query(models.Program)
         .options(joinedload(models.Program.mentor).joinedload(models.Mentor.user))
+        .filter(models.Program.term == target_term)
         .order_by(models.Program.number)
         .all()
     )
@@ -145,7 +155,7 @@ async def get_dashboard(
             "mentor_name": p.mentor.user.name if p.mentor and p.mentor.user else None,
         })
 
-    return {"members": members_data, "programs": programs_data}
+    return {"members": members_data, "programs": programs_data, "term": target_term}
 
 
 @router.post("/manual-complete")
@@ -155,17 +165,21 @@ async def manual_complete(
     current_user: models.User = Depends(auth_utils.require_admin),
 ):
     """システム外で実施済みのプログラムを管理者が完了として記録する"""
+    new_member = db.query(models.NewMember).filter(models.NewMember.id == req.new_member_id).first()
+    if not new_member:
+        raise HTTPException(status_code=404, detail="新メンバーが見つかりません")
+
+    # 新メンバー自身の所属期のプログラムを参照する
     program = (
         db.query(models.Program)
-        .filter(models.Program.number == req.program_number)
+        .filter(
+            models.Program.number == req.program_number,
+            models.Program.term == new_member.program_term,
+        )
         .first()
     )
     if not program:
         raise HTTPException(status_code=404, detail="プログラムが見つかりません")
-
-    new_member = db.query(models.NewMember).filter(models.NewMember.id == req.new_member_id).first()
-    if not new_member:
-        raise HTTPException(status_code=404, detail="新メンバーが見つかりません")
 
     # 既存の同プログラム予約があれば、それを完了状態に更新
     existing = (
@@ -238,6 +252,7 @@ async def get_members(
         if u.new_member:
             item["facebook_url"] = u.new_member.facebook_url
             item["new_member_id"] = u.new_member.id
+            item["program_term"] = u.new_member.program_term
         if u.mentor:
             item["mentor_id"] = u.mentor.id
             item["program_number"] = u.mentor.program_number
@@ -300,6 +315,10 @@ async def update_member(
 
     if req.facebook_url is not None and user.new_member:
         user.new_member.facebook_url = req.facebook_url
+    if req.program_term is not None and user.new_member:
+        if req.program_term < 1:
+            raise HTTPException(status_code=400, detail="期は1以上にしてください")
+        user.new_member.program_term = req.program_term
 
     db.commit()
     return {"message": "更新しました"}
@@ -339,12 +358,15 @@ async def delete_member(
 
 @router.get("/programs")
 async def get_programs(
+    term: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth_utils.require_mentor_or_admin),
 ):
+    target_term = term if term is not None else _get_or_create_settings(db).current_term
     programs = (
         db.query(models.Program)
         .options(joinedload(models.Program.mentor).joinedload(models.Mentor.user))
+        .filter(models.Program.term == target_term)
         .order_by(models.Program.number)
         .all()
     )
@@ -355,9 +377,58 @@ async def get_programs(
             "title": p.title,
             "mentor_id": p.mentor_id,
             "mentor_name": p.mentor.user.name if p.mentor and p.mentor.user else None,
+            "term": p.term,
         }
         for p in programs
     ]
+
+
+@router.get("/programs/terms")
+async def get_program_terms(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_mentor_or_admin),
+):
+    """プログラムが存在する期の一覧（新しい順）を返す"""
+    rows = (
+        db.query(models.Program.term)
+        .distinct()
+        .order_by(models.Program.term.desc())
+        .all()
+    )
+    return [r[0] for r in rows]
+
+
+@router.post("/programs/advance-term")
+async def advance_term(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth_utils.require_admin),
+):
+    """次の期のプログラムセット（#1〜#10）をまっさらな状態で新規作成し、
+    現在の期をその新しい期に切り替える。"""
+    settings = _get_or_create_settings(db)
+    current = settings.current_term
+
+    latest_programs = (
+        db.query(models.Program)
+        .filter(models.Program.term == current)
+        .order_by(models.Program.number)
+        .all()
+    )
+    if not latest_programs:
+        raise HTTPException(status_code=400, detail="現在の期のプログラムが見つかりません")
+
+    new_term = current + 1
+    existing = db.query(models.Program).filter(models.Program.term == new_term).first()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"第{new_term}期のプログラムは既に作成されています")
+
+    for p in latest_programs:
+        db.add(models.Program(number=p.number, title=p.title, term=new_term, mentor_id=None))
+
+    settings.current_term = new_term
+    db.commit()
+
+    return {"message": f"第{new_term}期のプログラムを作成しました", "term": new_term}
 
 
 @router.put("/programs/{program_id}")

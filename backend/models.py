@@ -86,6 +86,9 @@ class SystemSetting(Base):
 
 class Program(Base):
     __tablename__ = "programs"
+    __table_args__ = (
+        UniqueConstraint("number", "term", name="uq_program_number_term"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     number = Column(Integer, nullable=False)  # 1-10
