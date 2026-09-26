@@ -66,6 +66,13 @@ function deadlineStatus(
   return { level: "ok", label: `残${diffDays}日`, dueLabel };
 }
 
+// 期限が最も短いトレーニング（MSP2.0 = 30日以内）は赤字で強調する
+const URGENT_DAYS = 30;
+
+function isUrgent(t: Training): boolean {
+  return t.recommended_days != null && t.recommended_days <= URGENT_DAYS;
+}
+
 const DEADLINE_STYLES: Record<DeadlineLevel, string> = {
   overdue: "bg-red-100 text-red-700",
   soon: "bg-amber-100 text-amber-700",
@@ -224,11 +231,19 @@ export default function Training({ currentUser }: Props) {
                     {completed && checkIcon}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-medium ${completed ? "text-gray-400 line-through" : "text-gray-900"}`}>
+                    <div
+                      className={`text-sm font-medium ${
+                        completed
+                          ? "text-gray-400 line-through"
+                          : isUrgent(t)
+                          ? "text-red-600 font-bold"
+                          : "text-gray-900"
+                      }`}
+                    >
                       {t.name}
                     </div>
                     {t.recommended_days && (
-                      <div className="text-xs text-gray-400 mt-0.5">
+                      <div className={`text-xs mt-0.5 ${!completed && isUrgent(t) ? "text-red-500" : "text-gray-400"}`}>
                         初回定例会から{t.recommended_days}日以内に受講推奨
                       </div>
                     )}
@@ -266,12 +281,14 @@ export default function Training({ currentUser }: Props) {
                   {data.trainings.map((t) => (
                     <th
                       key={t.id}
-                      className="px-2 py-3 text-center text-xs font-semibold text-gray-600 min-w-[92px]"
+                      className={`px-2 py-3 text-center text-xs font-semibold min-w-[92px] ${
+                        isUrgent(t) ? "text-red-600" : "text-gray-600"
+                      }`}
                       title={t.recommended_days ? `${t.recommended_days}日以内に受講推奨` : undefined}
                     >
-                      <div className="leading-tight">{t.name}</div>
+                      <div className={`leading-tight ${isUrgent(t) ? "font-bold" : ""}`}>{t.name}</div>
                       {t.recommended_days && (
-                        <div className="text-[10px] font-normal text-gray-400 mt-0.5">
+                        <div className={`text-[10px] font-normal mt-0.5 ${isUrgent(t) ? "text-red-500" : "text-gray-400"}`}>
                           {t.recommended_days}日以内
                         </div>
                       )}
