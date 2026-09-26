@@ -46,10 +46,6 @@ class MentorUpdate(BaseModel):
     preferred_meeting: Optional[str] = None
 
 
-class SettingsUpdate(BaseModel):
-    current_term: int
-
-
 def _get_or_create_settings(db: Session) -> models.SystemSetting:
     settings = db.query(models.SystemSetting).first()
     if not settings:
@@ -69,18 +65,10 @@ async def get_settings(
     return {"current_term": settings.current_term}
 
 
-@router.put("/settings")
-async def update_settings(
-    req: SettingsUpdate,
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth_utils.require_admin),
-):
-    if req.current_term < 1:
-        raise HTTPException(status_code=400, detail="期は1以上にしてください")
-    settings = _get_or_create_settings(db)
-    settings.current_term = req.current_term
-    db.commit()
-    return {"current_term": settings.current_term}
+# 期(current_term)を直接書き換えるAPIは廃止した。
+# プログラムのレコードを伴わずに current_term だけが進んでしまうと、
+# ダッシュボードやプログラム担当変更画面が空になる事故につながるため、
+# 期を進めるには必ず /api/admin/programs/advance-term を使う。
 
 
 @router.get("/dashboard")

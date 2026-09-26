@@ -42,8 +42,6 @@ export default function Admin() {
   const [newMember, setNewMember] = useState({ name: "", email: "", facebook_url: "", role: "new_member" });
   const [adding, setAdding] = useState(false);
   const [currentTerm, setCurrentTerm] = useState<number | null>(null);
-  const [termInput, setTermInput] = useState("");
-  const [savingTerm, setSavingTerm] = useState(false);
   const [availableTerms, setAvailableTerms] = useState<number[]>([]);
   const [programTerm, setProgramTerm] = useState<number | null>(null);
   const [advancingTerm, setAdvancingTerm] = useState(false);
@@ -63,7 +61,6 @@ export default function Admin() {
       setPrograms(p);
       setMentors(mt);
       setCurrentTerm(s.current_term);
-      setTermInput(String(s.current_term));
       setAvailableTerms(terms);
       setProgramTerm(targetTerm);
     } catch (err: unknown) {
@@ -74,23 +71,6 @@ export default function Admin() {
   };
 
   useEffect(() => { fetchAll(); }, []);
-
-  async function handleSaveTerm() {
-    const value = Number(termInput);
-    if (!Number.isInteger(value) || value < 1) {
-      alert("期は1以上の整数で入力してください");
-      return;
-    }
-    setSavingTerm(true);
-    try {
-      const res = await api.put<{ current_term: number }>("/api/admin/settings", { current_term: value });
-      setCurrentTerm(res.current_term);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "期の更新に失敗しました");
-    } finally {
-      setSavingTerm(false);
-    }
-  }
 
   function handleChangeProgramTerm(term: number) {
     fetchAll(term);
@@ -244,25 +224,10 @@ export default function Admin() {
           <h1 className="text-2xl font-bold text-gray-900">管理・各種設定</h1>
           <p className="text-gray-500 text-sm mt-1">メンバーの入退会管理と、期ごとのメンター変更を行います</p>
         </div>
-        <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded-full">
-          <span className="text-sm text-gray-500">第</span>
-          <input
-            type="number"
-            min={1}
-            value={termInput}
-            onChange={(e) => setTermInput(e.target.value)}
-            className="w-12 bg-transparent text-sm font-medium text-gray-700 text-center border-b border-transparent focus:border-indigo-400 focus:outline-none"
-          />
-          <span className="text-sm text-gray-500">期</span>
-          {termInput !== String(currentTerm ?? "") && (
-            <button
-              onClick={handleSaveTerm}
-              disabled={savingTerm}
-              className="text-xs text-indigo-600 hover:underline disabled:opacity-50 ml-1"
-            >
-              {savingTerm ? "保存中..." : "保存"}
-            </button>
-          )}
+        <div className="bg-gray-100 px-3 py-1 rounded-full">
+          <span className="text-sm font-medium text-gray-700">
+            現在は第{currentTerm ?? "-"}期
+          </span>
         </div>
       </div>
 
