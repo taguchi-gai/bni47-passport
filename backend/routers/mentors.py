@@ -107,8 +107,10 @@ async def get_assigned_new_members(
     for nm in new_members:
         already_booked = False
         if program:
+            # 期をまたいでも同じプログラム番号として判定する
+            # (例: 12期で完了済みのプログラムは13期メンターから見ても予約済み扱い)
             already_booked = any(
-                b.program_id == program.id for b in nm.bookings
+                b.program and b.program.number == program.number for b in nm.bookings
             )
 
         bookings_by_slot = {b.slot_id: b for b in nm.bookings}

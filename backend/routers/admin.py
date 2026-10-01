@@ -82,8 +82,20 @@ async def get_dashboard(
             raise HTTPException(status_code=400, detail="新メンバー情報がありません")
         # 新メンバー本人は必ず自分の所属期を見る（term指定は無視）
         target_term = current_user.new_member.program_term
+    elif term is not None:
+        target_term = term
+    elif current_user.role == models.RoleEnum.mentor and current_user.mentor:
+        # メンターがログインしたときの初期表示は、自分が現在担当している
+        # プログラムの期を優先する（例: 12期の担当メンターなら12期が初期表示）
+        mentor_program = (
+            db.query(models.Program)
+            .filter(models.Program.mentor_id == current_user.mentor.id)
+            .order_by(models.Program.term.desc())
+            .first()
+        )
+        target_term = mentor_program.term if mentor_program else _get_or_create_settings(db).current_term
     else:
-        target_term = term if term is not None else _get_or_create_settings(db).current_term
+        target_term = _get_or_create_settings(db).current_term
 
     nm_query = (
         db.query(models.NewMember)

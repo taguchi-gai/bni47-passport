@@ -85,11 +85,14 @@ async def create_booking(
             detail="この新メンバーの所属期と異なる期のプログラムです。担当メンター・期の設定を確認してください。",
         )
 
+    # 重複判定はプログラム番号(期をまたいでも同じプログラムとして扱う)で行う。
+    # 例えば12期で完了済みのプログラム#10を、13期で改めて予約することを防ぐ。
     existing_booking = (
         db.query(models.Booking)
+        .join(models.Program, models.Booking.program_id == models.Program.id)
         .filter(
             models.Booking.new_member_id == new_member.id,
-            models.Booking.program_id == program.id,
+            models.Program.number == program.number,
         )
         .first()
     )
