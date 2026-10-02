@@ -102,3 +102,23 @@ BNIチャプターの期は6ヶ月単位で交代する。期が変わるタイ�
 - 藤原さん・山梨さんの削除（既存のDELETE /api/admin/members/{id}で対応）
 - 山口さんによる久保さんの#10完了チェック（アプリ上で本人に操作してもらう、
   または管理者が代理でbooking完了操作を行う）
+
+---
+
+# 追補: Google Meet に入室できない問題の対応
+
+決定日: 2026-10-02
+
+## 症状・仮説
+- Calendar の conferenceData で発行した Meet は、主催者が誰も入室しないシステムアカウント(bni47.passport@gmail.com)。
+  Googleアカウントを持たない参加者は「参加をリクエスト」しても承認されず入室できない（仮説。実機未検証）。
+
+## 方針（A案）
+- Meet REST API `spaces.create` で `accessType=OPEN` の部屋を作り、`meetingUri` を Calendar の location/description に入れる（conferenceData は使わない）
+- Meet API 失敗時（スコープ未付与など）は従来の conferenceData 方式にフォールバック
+- Meet API 用の資格情報は Calendar 用と分離（新スコープ未付与の refresh token でも Calendar が壊れないように）
+- スコープ追加: `https://www.googleapis.com/auth/meetings.space.created`（GCP同意画面＋get_google_token.py）
+- 本番反映: refresh token 取り直し → Render の GOOGLE_REFRESH_TOKEN 更新 → デプロイ
+
+## B案（A不可の場合）
+- メール本文に入室案内、メンター共同ホスト化、Zoom固定URL利用促進

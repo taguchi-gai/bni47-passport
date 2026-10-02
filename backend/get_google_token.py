@@ -18,6 +18,7 @@ load_dotenv()
 SCOPES = [
     "https://www.googleapis.com/auth/calendar.events",
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/meetings.space.created",
 ]
 
 CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -41,10 +42,16 @@ print("=" * 60)
 print("BNI パスポート - Google 認証セットアップ")
 print("=" * 60)
 print("\nブラウザが開きます。システム用Googleアカウントでログインし、")
-print("Calendar と Gmail の権限を許可してください。\n")
+print("Calendar・Gmail・Meet の権限を許可してください。\n")
 
 flow = InstalledAppFlow.from_client_config(client_config, scopes=SCOPES)
-creds = flow.run_local_server(port=0, prompt="consent", access_type="offline")
+creds = flow.run_local_server(
+    port=0,
+    prompt="consent",
+    access_type="offline",
+    open_browser=False,
+    authorization_prompt_message="次のURLをブラウザで開いてください:\n{url}\n",
+)
 
 print("\n" + "=" * 60)
 print("[OK] 認証成功！以下の値を .env に設定してください：")

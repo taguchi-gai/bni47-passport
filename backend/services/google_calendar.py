@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from google.oauth2.credentials import Credentials
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request, AuthorizedSession
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -22,19 +22,43 @@ SCOPES = [
     "https://www.googleapis.com/auth/gmail.send",
 ]
 
+# Meet REST API 用。新スコープ未付与の refresh token でも Calendar が壊れないよう、資格情報は分離する
+MEET_SCOPES = ["https://www.googleapis.com/auth/meetings.space.created"]
 
-def _get_credentials() -> Credentials:
+
+def _get_credentials(scopes: list[str] | None = None) -> Credentials:
     creds = Credentials(
         token=None,
         refresh_token=GOOGLE_REFRESH_TOKEN,
         token_uri="https://oauth2.googleapis.com/token",
         client_id=GOOGLE_CLIENT_ID,
         client_secret=GOOGLE_CLIENT_SECRET,
-        scopes=SCOPES,
+        scopes=scopes or SCOPES,
     )
     if not creds.valid:
         creds.refresh(Request())
     return creds
+
+
+def _create_open_meet_url() -> str | None:
+    """
+    Meet REST API で accessType=OPEN（リンクを知っている人は承認なしで入室可）の部屋を作る。
+    失敗時は None を返し、呼び出し側が従来方式にフォールバックする。
+    """
+    try:
+        session = AuthorizedSession(_get_credentials(MEET_SCOPES))
+        resp = session.post(
+            "https://meet.googleapis.com/v2/spaces",
+            json={"config": {"accessType": "OPEN"}},
+            timeout=15,
+        )
+        if resp.status_code != 200:
+            print(f"Meet API error: {resp.status_code} {resp.text[:300]}")
+            return None
+        return resp.json().get("meetingUri") or None
+    except Exception as e:
+        print(f"Meet API failed, falling back to conferenceData: {e}")
+        return None
 
 
 def create_meet_event(
@@ -71,9 +95,13 @@ def create_meet_event(
         start_iso = start_datetime.isoformat() + "Z"
         end_iso = end_datetime.isoformat() + "Z"
 
+        open_meet_url = None if zoom_url else _create_open_meet_url()
+
         description = f"BNI 47∞チャプター パスポートプログラム #{program_number}\nメンター: {mentor_name}\n新メンバー: {new_member_name}"
         if zoom_url:
             description += f"\n\nZoom URL: {zoom_url}"
+        elif open_meet_url:
+            description += f"\n\nGoogle Meet: {open_meet_url}"
 
         event = {
             "summary": f"BNI パスポート #{program_number} - {mentor_name} × {new_member_name}",
@@ -101,6 +129,8 @@ def create_meet_event(
 
         if zoom_url:
             event["location"] = zoom_url
+        elif open_meet_url:
+            event["location"] = open_meet_url
         else:
             event["conferenceData"] = {
                 "createRequest": {
@@ -118,6 +148,8 @@ def create_meet_event(
 
         if zoom_url:
             return {"event_id": created["id"], "meet_url": zoom_url}
+        if open_meet_url:
+            return {"event_id": created["id"], "meet_url": open_meet_url}
 
         meet_url = ""
         conf = created.get("conferenceData", {})
