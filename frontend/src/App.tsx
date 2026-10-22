@@ -27,7 +27,11 @@ export default function App() {
     window.location.pathname === "/reset-password" ? "reset_password" : "login"
   );
   const [resetToken] = useState<string>(() => new URLSearchParams(window.location.search).get("token") || "");
-  const [loading, setLoading] = useState(true);
+  // トークンがあるときだけ、ログイン状態の確認が終わるまで読み込み中にする
+  // （URL の token パラメータは下の effect で localStorage に保存される）
+  const [loading, setLoading] = useState(
+    () => !!(new URLSearchParams(window.location.search).get("token") || localStorage.getItem("token"))
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // URL params でメンター設定ページへのリダイレクト対応
@@ -42,10 +46,7 @@ export default function App() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
     api.get<User>("/api/auth/me")
       .then((u) => {
         setUser(u);

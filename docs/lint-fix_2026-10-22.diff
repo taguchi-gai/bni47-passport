@@ -1,0 +1,351 @@
+diff --git a/frontend/eslint.config.mjs b/frontend/eslint.config.mjs
+new file mode 100644
+index 0000000..aea00a6
+--- /dev/null
++++ b/frontend/eslint.config.mjs
+@@ -0,0 +1,15 @@
++import tseslint from "typescript-eslint";
++import reactHooks from "eslint-plugin-react-hooks";
++
++export default tseslint.config(
++  { ignores: ["node_modules/**", ".next/**", "dist/**"] },
++  {
++    files: ["**/*.{ts,tsx}"],
++    extends: [tseslint.configs.base],
++    plugins: { "react-hooks": reactHooks },
++    rules: {
++      ...reactHooks.configs.recommended.rules,
++      "@typescript-eslint/no-explicit-any": "error",
++    },
++  },
++);
+diff --git a/frontend/package.json b/frontend/package.json
+index 79a6fc8..fb20109 100644
+--- a/frontend/package.json
++++ b/frontend/package.json
+@@ -17,9 +17,12 @@
+     "@types/react-dom": "^18.3.0",
+     "@vitejs/plugin-react": "^4.3.1",
+     "autoprefixer": "^10.4.20",
++    "eslint": "^9.39.5",
++    "eslint-plugin-react-hooks": "^7.1.1",
+     "postcss": "^8.4.47",
+     "tailwindcss": "^3.4.13",
+     "typescript": "^5.5.3",
++    "typescript-eslint": "^8.72.0",
+     "vite": "^5.4.8"
+   }
+ }
+diff --git a/frontend/src/App.tsx b/frontend/src/App.tsx
+index 782c994..e3d3d7d 100644
+--- a/frontend/src/App.tsx
++++ b/frontend/src/App.tsx
+@@ -27,7 +27,11 @@ export default function App() {
+     window.location.pathname === "/reset-password" ? "reset_password" : "login"
+   );
+   const [resetToken] = useState<string>(() => new URLSearchParams(window.location.search).get("token") || "");
+-  const [loading, setLoading] = useState(true);
++  // トークンがあるときだけ、ログイン状態の確認が終わるまで読み込み中にする
++  // （URL の token パラメータは下の effect で localStorage に保存される）
++  const [loading, setLoading] = useState(
++    () => !!(new URLSearchParams(window.location.search).get("token") || localStorage.getItem("token"))
++  );
+   const [sidebarOpen, setSidebarOpen] = useState(false);
+ 
+   // URL params でメンター設定ページへのリダイレクト対応
+@@ -42,10 +46,7 @@ export default function App() {
+ 
+   useEffect(() => {
+     const token = localStorage.getItem("token");
+-    if (!token) {
+-      setLoading(false);
+-      return;
+-    }
++    if (!token) return;
+     api.get<User>("/api/auth/me")
+       .then((u) => {
+         setUser(u);
+diff --git a/frontend/src/pages/Admin.tsx b/frontend/src/pages/Admin.tsx
+index 27ccde0..84f88ba 100644
+--- a/frontend/src/pages/Admin.tsx
++++ b/frontend/src/pages/Admin.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from "react";
++import { useCallback, useEffect, useState } from "react";
+ import { api } from "../api/client";
+ 
+ interface Member {
+@@ -31,6 +31,32 @@ interface Mentor {
+   program_number: number | null;
+ }
+ 
++interface AdminData {
++  members: Member[];
++  mentors: Mentor[];
++  programs: Program[];
++  currentTerm: number;
++  availableTerms: number[];
++  programTerm: number;
++}
++
++// 管理画面のデータをまとめて取得する（state には触れない）
++async function loadAdminData(term: number | null): Promise<AdminData> {
++  const [m, mt, s, terms] = await Promise.all([
++    api.get<Member[]>("/api/admin/members"),
++    api.get<Mentor[]>("/api/admin/mentors"),
++    api.get<{ current_term: number }>("/api/admin/settings"),
++    api.get<number[]>("/api/admin/programs/terms"),
++  ]);
++  const targetTerm = term ?? s.current_term;
++  const p = await api.get<Program[]>(`/api/admin/programs?term=${targetTerm}`);
++  return { members: m, mentors: mt, programs: p, currentTerm: s.current_term, availableTerms: terms, programTerm: targetTerm };
++}
++
++function errorMessage(err: unknown): string {
++  return err instanceof Error ? err.message : "データの取得に失敗しました";
++}
++
+ export default function Admin() {
+   const [members, setMembers] = useState<Member[]>([]);
+   const [programs, setPrograms] = useState<Program[]>([]);
+@@ -46,31 +72,35 @@ export default function Admin() {
+   const [programTerm, setProgramTerm] = useState<number | null>(null);
+   const [advancingTerm, setAdvancingTerm] = useState(false);
+ 
++  const applyAdminData = useCallback((d: AdminData) => {
++    setMembers(d.members);
++    setPrograms(d.programs);
++    setMentors(d.mentors);
++    setCurrentTerm(d.currentTerm);
++    setAvailableTerms(d.availableTerms);
++    setProgramTerm(d.programTerm);
++  }, []);
++
++  const showError = useCallback((err: unknown) => setError(errorMessage(err)), []);
++
++  // 期の切り替え・追加・削除などのあとの再取得用
+   const fetchAll = async (term?: number) => {
+     setLoading(true);
+     try {
+-      const [m, mt, s, terms] = await Promise.all([
+-        api.get<Member[]>("/api/admin/members"),
+-        api.get<Mentor[]>("/api/admin/mentors"),
+-        api.get<{ current_term: number }>("/api/admin/settings"),
+-        api.get<number[]>("/api/admin/programs/terms"),
+-      ]);
+-      const targetTerm = term ?? programTerm ?? s.current_term;
+-      const p = await api.get<Program[]>(`/api/admin/programs?term=${targetTerm}`);
+-      setMembers(m);
+-      setPrograms(p);
+-      setMentors(mt);
+-      setCurrentTerm(s.current_term);
+-      setAvailableTerms(terms);
+-      setProgramTerm(targetTerm);
++      applyAdminData(await loadAdminData(term ?? programTerm));
+     } catch (err: unknown) {
+-      setError(err instanceof Error ? err.message : "データの取得に失敗しました");
++      showError(err);
+     } finally {
+       setLoading(false);
+     }
+   };
+ 
+-  useEffect(() => { fetchAll(); }, []);
++  // 初回の取得（loading は初期値で true）
++  useEffect(() => {
++    loadAdminData(null)
++      .then(applyAdminData, showError)
++      .finally(() => setLoading(false));
++  }, [applyAdminData, showError]);
+ 
+   function handleChangeProgramTerm(term: number) {
+     fetchAll(term);
+diff --git a/frontend/src/pages/Dashboard.tsx b/frontend/src/pages/Dashboard.tsx
+index 762a2db..dab822a 100644
+--- a/frontend/src/pages/Dashboard.tsx
++++ b/frontend/src/pages/Dashboard.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from "react";
++import { useCallback, useEffect, useState } from "react";
+ import { api } from "../api/client";
+ 
+ interface Program {
+@@ -36,6 +36,16 @@ interface Props {
+   currentUser: { id: number; name: string; role: string };
+ }
+ 
++// ダッシュボードのデータを取得する（state には触れない）
++function loadDashboard(isNewMember: boolean, term?: number | null): Promise<DashboardData> {
++  const query = !isNewMember && term ? `?term=${term}` : "";
++  return api.get<DashboardData>(`/api/admin/dashboard${query}`);
++}
++
++function errorMessage(err: unknown): string {
++  return err instanceof Error ? err.message : "データの取得に失敗しました";
++}
++
+ export default function Dashboard({ currentUser }: Props) {
+   const [data, setData] = useState<DashboardData | null>(null);
+   const [loading, setLoading] = useState(true);
+@@ -47,22 +57,30 @@ export default function Dashboard({ currentUser }: Props) {
+ 
+   const isNewMember = currentUser.role === "new_member";
+ 
++  const applyDashboard = useCallback((d: DashboardData) => {
++    setData(d);
++    if (d.term) setViewTerm(d.term);
++  }, []);
++
++  const showError = useCallback((err: unknown) => setError(errorMessage(err)), []);
++
++  // 期の切り替え・完了記録などのあとの再取得用
+   const fetchData = async (term?: number | null) => {
+     setLoading(true);
+     try {
+-      const query = !isNewMember && term ? `?term=${term}` : "";
+-      const d = await api.get<DashboardData>(`/api/admin/dashboard${query}`);
+-      setData(d);
+-      if (d.term) setViewTerm(d.term);
++      applyDashboard(await loadDashboard(isNewMember, term));
+     } catch (err: unknown) {
+-      setError(err instanceof Error ? err.message : "データの取得に失敗しました");
++      showError(err);
+     } finally {
+       setLoading(false);
+     }
+   };
+ 
++  // 初回の取得（loading は初期値で true）
+   useEffect(() => {
+-    fetchData();
++    loadDashboard(isNewMember)
++      .then(applyDashboard, showError)
++      .finally(() => setLoading(false));
+     api.get<{ current_term: number }>("/api/admin/settings")
+       .then((s) => setCurrentTerm(s.current_term))
+       .catch(() => {});
+diff --git a/frontend/src/pages/Schedule.tsx b/frontend/src/pages/Schedule.tsx
+index 009b035..38834e2 100644
+--- a/frontend/src/pages/Schedule.tsx
++++ b/frontend/src/pages/Schedule.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from "react";
++import { useCallback, useEffect, useState } from "react";
+ import { api } from "../api/client";
+ 
+ interface Slot {
+@@ -65,6 +65,26 @@ function parseServerDate(s: string): Date {
+ 
+ const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
+ 
++type ScheduleData =
++  | { kind: "new_member"; slots: Slot[] }
++  | { kind: "mentor"; members: NewMember[]; mentorInfo: MentorInfo };
++
++// 役割に応じたスケジュールのデータを取得する（state には触れない）
++async function loadSchedule(isNewMember: boolean): Promise<ScheduleData> {
++  if (isNewMember) {
++    return { kind: "new_member", slots: await api.get<Slot[]>("/api/availability/my") };
++  }
++  const [members, mentorInfo] = await Promise.all([
++    api.get<NewMember[]>("/api/mentors/new-members"),
++    api.get<MentorInfo>("/api/mentors/me"),
++  ]);
++  return { kind: "mentor", members, mentorInfo };
++}
++
++function errorMessage(err: unknown): string {
++  return err instanceof Error ? err.message : "データの取得に失敗しました";
++}
++
+ export default function Schedule({ currentUser }: Props) {
+   const [weekBase, setWeekBase] = useState(new Date());
+   const [mySlots, setMySlots] = useState<Slot[]>([]);
+@@ -81,37 +101,45 @@ export default function Schedule({ currentUser }: Props) {
+ 
+   const weekDays = getWeekDays(weekBase);
+ 
++  const applySchedule = useCallback((d: ScheduleData) => {
++    if (d.kind === "new_member") {
++      setMySlots(d.slots);
++      return;
++    }
++    const { members, mentorInfo } = d;
++    setNewMembers(members);
++    setMyProgram(mentorInfo.program);
++    setMyMentorId(mentorInfo.id);
++    if (members.length > 0) {
++      // 関数形式で stale closure を回避（再取得時に古い selectedMember を参照しがち）
++      setSelectedMember((prev) => {
++        if (!prev) return members[0];
++        const found = members.find((m) => m.id === prev.id);
++        return found ?? members[0];
++      });
++    }
++  }, []);
++
++  const showError = useCallback((err: unknown) => setError(errorMessage(err)), []);
++
++  // 予約・枠の変更などのあとの再取得用
+   const fetchData = async () => {
+     setLoading(true);
+     try {
+-      if (isNewMember) {
+-        const slots = await api.get<Slot[]>("/api/availability/my");
+-        setMySlots(slots);
+-      } else {
+-        const [members, mentorInfo] = await Promise.all([
+-          api.get<NewMember[]>("/api/mentors/new-members"),
+-          api.get<MentorInfo>("/api/mentors/me"),
+-        ]);
+-        setNewMembers(members);
+-        setMyProgram(mentorInfo.program);
+-        setMyMentorId(mentorInfo.id);
+-        if (members.length > 0) {
+-          // 関数形式で stale closure を回避（fetchData は古い selectedMember を参照しがち）
+-          setSelectedMember((prev) => {
+-            if (!prev) return members[0];
+-            const found = members.find((m) => m.id === prev.id);
+-            return found ?? members[0];
+-          });
+-        }
+-      }
++      applySchedule(await loadSchedule(isNewMember));
+     } catch (err: unknown) {
+-      setError(err instanceof Error ? err.message : "データの取得に失敗しました");
++      showError(err);
+     } finally {
+       setLoading(false);
+     }
+   };
+ 
+-  useEffect(() => { fetchData(); }, []);
++  // 初回の取得（loading は初期値で true）
++  useEffect(() => {
++    loadSchedule(isNewMember)
++      .then(applySchedule, showError)
++      .finally(() => setLoading(false));
++  }, [isNewMember, applySchedule, showError]);
+ 
+   async function toggleSlot(date: Date, hour: number) {
+     if (!isNewMember) return;
+diff --git a/frontend/src/pages/Training.tsx b/frontend/src/pages/Training.tsx
+index b6dadda..52a1bb6 100644
+--- a/frontend/src/pages/Training.tsx
++++ b/frontend/src/pages/Training.tsx
+@@ -105,7 +105,14 @@ export default function Training({ currentUser }: Props) {
+     }
+   };
+ 
+-  useEffect(() => { fetchData(); }, []);
++  // 初回の取得（loading は初期値で true）
++  useEffect(() => {
++    api.get<TrainingData>("/api/trainings/records")
++      .then(setData, (err: unknown) => {
++        setError(err instanceof Error ? err.message : "データの取得に失敗しました");
++      })
++      .finally(() => setLoading(false));
++  }, []);
+ 
+   async function handleToggle(memberId: number, trainingId: number) {
+     const key = `${memberId}-${trainingId}`;

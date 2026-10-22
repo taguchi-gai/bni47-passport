@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 
 interface Member {
@@ -31,6 +31,32 @@ interface Mentor {
   program_number: number | null;
 }
 
+interface AdminData {
+  members: Member[];
+  mentors: Mentor[];
+  programs: Program[];
+  currentTerm: number;
+  availableTerms: number[];
+  programTerm: number;
+}
+
+// 管理画面のデータをまとめて取得する（state には触れない）
+async function loadAdminData(term: number | null): Promise<AdminData> {
+  const [m, mt, s, terms] = await Promise.all([
+    api.get<Member[]>("/api/admin/members"),
+    api.get<Mentor[]>("/api/admin/mentors"),
+    api.get<{ current_term: number }>("/api/admin/settings"),
+    api.get<number[]>("/api/admin/programs/terms"),
+  ]);
+  const targetTerm = term ?? s.current_term;
+  const p = await api.get<Program[]>(`/api/admin/programs?term=${targetTerm}`);
+  return { members: m, mentors: mt, programs: p, currentTerm: s.current_term, availableTerms: terms, programTerm: targetTerm };
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "データの取得に失敗しました";
+}
+
 export default function Admin() {
   const [members, setMembers] = useState<Member[]>([]);
   const [programs, setPrograms] = useState<Program[]>([]);
@@ -46,31 +72,35 @@ export default function Admin() {
   const [programTerm, setProgramTerm] = useState<number | null>(null);
   const [advancingTerm, setAdvancingTerm] = useState(false);
 
+  const applyAdminData = useCallback((d: AdminData) => {
+    setMembers(d.members);
+    setPrograms(d.programs);
+    setMentors(d.mentors);
+    setCurrentTerm(d.currentTerm);
+    setAvailableTerms(d.availableTerms);
+    setProgramTerm(d.programTerm);
+  }, []);
+
+  const showError = useCallback((err: unknown) => setError(errorMessage(err)), []);
+
+  // 期の切り替え・追加・削除などのあとの再取得用
   const fetchAll = async (term?: number) => {
     setLoading(true);
     try {
-      const [m, mt, s, terms] = await Promise.all([
-        api.get<Member[]>("/api/admin/members"),
-        api.get<Mentor[]>("/api/admin/mentors"),
-        api.get<{ current_term: number }>("/api/admin/settings"),
-        api.get<number[]>("/api/admin/programs/terms"),
-      ]);
-      const targetTerm = term ?? programTerm ?? s.current_term;
-      const p = await api.get<Program[]>(`/api/admin/programs?term=${targetTerm}`);
-      setMembers(m);
-      setPrograms(p);
-      setMentors(mt);
-      setCurrentTerm(s.current_term);
-      setAvailableTerms(terms);
-      setProgramTerm(targetTerm);
+      applyAdminData(await loadAdminData(term ?? programTerm));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "データの取得に失敗しました");
+      showError(err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchAll(); }, []);
+  // 初回の取得（loading は初期値で true）
+  useEffect(() => {
+    loadAdminData(null)
+      .then(applyAdminData, showError)
+      .finally(() => setLoading(false));
+  }, [applyAdminData, showError]);
 
   function handleChangeProgramTerm(term: number) {
     fetchAll(term);

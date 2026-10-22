@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 
 interface Slot {
@@ -65,6 +65,26 @@ function parseServerDate(s: string): Date {
 
 const DAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
+type ScheduleData =
+  | { kind: "new_member"; slots: Slot[] }
+  | { kind: "mentor"; members: NewMember[]; mentorInfo: MentorInfo };
+
+// 役割に応じたスケジュールのデータを取得する（state には触れない）
+async function loadSchedule(isNewMember: boolean): Promise<ScheduleData> {
+  if (isNewMember) {
+    return { kind: "new_member", slots: await api.get<Slot[]>("/api/availability/my") };
+  }
+  const [members, mentorInfo] = await Promise.all([
+    api.get<NewMember[]>("/api/mentors/new-members"),
+    api.get<MentorInfo>("/api/mentors/me"),
+  ]);
+  return { kind: "mentor", members, mentorInfo };
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "データの取得に失敗しました";
+}
+
 export default function Schedule({ currentUser }: Props) {
   const [weekBase, setWeekBase] = useState(new Date());
   const [mySlots, setMySlots] = useState<Slot[]>([]);
@@ -81,37 +101,45 @@ export default function Schedule({ currentUser }: Props) {
 
   const weekDays = getWeekDays(weekBase);
 
+  const applySchedule = useCallback((d: ScheduleData) => {
+    if (d.kind === "new_member") {
+      setMySlots(d.slots);
+      return;
+    }
+    const { members, mentorInfo } = d;
+    setNewMembers(members);
+    setMyProgram(mentorInfo.program);
+    setMyMentorId(mentorInfo.id);
+    if (members.length > 0) {
+      // 関数形式で stale closure を回避（再取得時に古い selectedMember を参照しがち）
+      setSelectedMember((prev) => {
+        if (!prev) return members[0];
+        const found = members.find((m) => m.id === prev.id);
+        return found ?? members[0];
+      });
+    }
+  }, []);
+
+  const showError = useCallback((err: unknown) => setError(errorMessage(err)), []);
+
+  // 予約・枠の変更などのあとの再取得用
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (isNewMember) {
-        const slots = await api.get<Slot[]>("/api/availability/my");
-        setMySlots(slots);
-      } else {
-        const [members, mentorInfo] = await Promise.all([
-          api.get<NewMember[]>("/api/mentors/new-members"),
-          api.get<MentorInfo>("/api/mentors/me"),
-        ]);
-        setNewMembers(members);
-        setMyProgram(mentorInfo.program);
-        setMyMentorId(mentorInfo.id);
-        if (members.length > 0) {
-          // 関数形式で stale closure を回避（fetchData は古い selectedMember を参照しがち）
-          setSelectedMember((prev) => {
-            if (!prev) return members[0];
-            const found = members.find((m) => m.id === prev.id);
-            return found ?? members[0];
-          });
-        }
-      }
+      applySchedule(await loadSchedule(isNewMember));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "データの取得に失敗しました");
+      showError(err);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  // 初回の取得（loading は初期値で true）
+  useEffect(() => {
+    loadSchedule(isNewMember)
+      .then(applySchedule, showError)
+      .finally(() => setLoading(false));
+  }, [isNewMember, applySchedule, showError]);
 
   async function toggleSlot(date: Date, hour: number) {
     if (!isNewMember) return;

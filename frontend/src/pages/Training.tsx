@@ -105,7 +105,14 @@ export default function Training({ currentUser }: Props) {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  // 初回の取得（loading は初期値で true）
+  useEffect(() => {
+    api.get<TrainingData>("/api/trainings/records")
+      .then(setData, (err: unknown) => {
+        setError(err instanceof Error ? err.message : "データの取得に失敗しました");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   async function handleToggle(memberId: number, trainingId: number) {
     const key = `${memberId}-${trainingId}`;

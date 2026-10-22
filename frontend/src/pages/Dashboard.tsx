@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api/client";
 
 interface Program {
@@ -36,6 +36,16 @@ interface Props {
   currentUser: { id: number; name: string; role: string };
 }
 
+// ダッシュボードのデータを取得する（state には触れない）
+function loadDashboard(isNewMember: boolean, term?: number | null): Promise<DashboardData> {
+  const query = !isNewMember && term ? `?term=${term}` : "";
+  return api.get<DashboardData>(`/api/admin/dashboard${query}`);
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : "データの取得に失敗しました";
+}
+
 export default function Dashboard({ currentUser }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,22 +57,30 @@ export default function Dashboard({ currentUser }: Props) {
 
   const isNewMember = currentUser.role === "new_member";
 
+  const applyDashboard = useCallback((d: DashboardData) => {
+    setData(d);
+    if (d.term) setViewTerm(d.term);
+  }, []);
+
+  const showError = useCallback((err: unknown) => setError(errorMessage(err)), []);
+
+  // 期の切り替え・完了記録などのあとの再取得用
   const fetchData = async (term?: number | null) => {
     setLoading(true);
     try {
-      const query = !isNewMember && term ? `?term=${term}` : "";
-      const d = await api.get<DashboardData>(`/api/admin/dashboard${query}`);
-      setData(d);
-      if (d.term) setViewTerm(d.term);
+      applyDashboard(await loadDashboard(isNewMember, term));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "データの取得に失敗しました");
+      showError(err);
     } finally {
       setLoading(false);
     }
   };
 
+  // 初回の取得（loading は初期値で true）
   useEffect(() => {
-    fetchData();
+    loadDashboard(isNewMember)
+      .then(applyDashboard, showError)
+      .finally(() => setLoading(false));
     api.get<{ current_term: number }>("/api/admin/settings")
       .then((s) => setCurrentTerm(s.current_term))
       .catch(() => {});
